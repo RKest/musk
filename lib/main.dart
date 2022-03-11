@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'utils.dart';
+import 'functional.dart';
 
 void main() {
   runApp(const MyApp());
@@ -29,18 +30,30 @@ class _MyAppState extends State<MyApp> {
     });
     await for (HttpRequest request in server) {
       if (request.method == "GET") {
-        request.response
-          ..headers.contentType = ContentType("text", "html", charset: "utf-8")
-          ..write((await Utils.loadAsset('index.html'))
-              .replaceFirst('{{}}', listeningAddress))
-          ..close();
+        final String requestPath = request.requestedUri.path;
+        if (requestPath.endsWith('.js') || requestPath.endsWith('.css')) {
+          request.response
+            ..headers.contentType = ContentType(
+                "text", requestPath.endsWith('.js') ? "javascript" : "css",
+                charset: "utf-8")
+            ..write(await Utils.loadAsset(requestPath.replaceFirst('/', '')))
+            ..close();
+        } else {
+          request.response
+            ..headers.contentType =
+                ContentType("text", "html", charset: "utf-8")
+            ..write((await Utils.loadAsset('index.html'))
+                .replaceFirst('{{}}', listeningAddress))
+            ..close();
+        }
       } else if (request.method == "POST") {
         Stream<Uint8List> brodcast = request.asBroadcastStream();
         brodcast.listen(
           (event) {
-            print(event);
+            print(event.map((e) => String.fromCharCode(e)).join());
           },
           onDone: () {
+            request.response.close();
             print("DONE");
           },
         );

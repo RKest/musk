@@ -19,7 +19,7 @@ class Utils
 
   static Future<File> getFile(String file) async {
     final path = await getFilePath;
-    return File("$path/$file");
+    return File("$path$file");
   }
 
   static Future<String> loadAsset(String path) async {
