@@ -2,8 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'multipart.dart';
 import 'utils.dart';
-import 'functional.dart';
 
 void main() {
   runApp(const MyApp());
@@ -36,7 +36,7 @@ class _MyAppState extends State<MyApp> {
             ..headers.contentType = ContentType(
                 "text", requestPath.endsWith('.js') ? "javascript" : "css",
                 charset: "utf-8")
-            ..write(await Utils.loadAsset(requestPath.replaceFirst('/', '')))
+            ..write(await Utils.loadAsset(requestPath.replaceAll('/', '')))
             ..close();
         } else {
           request.response
@@ -47,16 +47,15 @@ class _MyAppState extends State<MyApp> {
             ..close();
         }
       } else if (request.method == "POST") {
+        bool isFirst = true;
         Stream<Uint8List> brodcast = request.asBroadcastStream();
-        brodcast.listen(
-          (event) {
-            print(event.map((e) => String.fromCharCode(e)).join());
-          },
-          onDone: () {
-            request.response.close();
-            print("DONE");
-          },
-        );
+        brodcast.listen((event) {
+          if (isFirst){
+            print('FIRST: ${Multipart.getFilename(event)}');
+            isFirst = false;
+          }
+          print(event.map((e) => String.fromCharCode(e)).join());
+        }, onDone: () => request.response.close(),);
       }
     }
   }
