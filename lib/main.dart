@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:audiotagger/models/tag.dart';
 import 'package:flutter/material.dart';
 import 'multipart.dart';
 import 'utils.dart';
@@ -23,6 +24,17 @@ class _MyAppState extends State<MyApp> {
   final myController = TextEditingController();
 
   startServer() async {
+    var ents = await Utils.scanDir(await Utils.getFilePath);
+
+    for (FileSystemEntity ent in ents) {
+      final bool isFile = await FileSystemEntity.isFile(ent.path);
+      if (isFile && ent.path.endsWith('.mp3')) {
+        print('Ent: $ent');
+        final Tag tags = await Utils.getTags(ent.path);
+        print('Tags: $tags');
+      }
+    }
+
     var server = await HttpServer.bind(InternetAddress.anyIPv4, 8080);
     String ip = await Utils.localIp ?? "Err while getting the ip";
     setState(() {
@@ -48,14 +60,18 @@ class _MyAppState extends State<MyApp> {
         }
       } else if (request.method == "POST") {
         bool isFirst = true;
+        String fileName = "Err";
         Stream<Uint8List> brodcast = request.asBroadcastStream();
-        brodcast.listen((event) {
-          if (isFirst){
-            print('FIRST: ${Multipart.getFilename(event)}');
+        await for (Uint8List event in brodcast) {
+          if (isFirst) {
+            fileName = Multipart.getFilename(event);
+            print('Starting: $fileName');
             isFirst = false;
           }
-          print(event.map((e) => String.fromCharCode(e)).join());
-        }, onDone: () => request.response.close(),);
+          Utils.saveToFile(fileName, event);
+        }
+        print("Done");
+        request.response.close();
       }
     }
   }
