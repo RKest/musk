@@ -21,7 +21,7 @@ class Tag {
     "album": "Unknown"
   };
 
-  late Uint8List? picture;
+  Uint8List picture = Uint8List(0);
 
   Tag.fromBytes(Uint8List bytes){
     assert(bytes.sublist(0, 5) == [0x49, 0x44, 0x33, 3, 0]);
@@ -61,9 +61,29 @@ class Tag {
     data["album"] = album ?? "Unknown";
   }
 
-  // Uint8List encode(){
+  Uint8List encode(){
+    //I, D, 3, ver 3, rev 0, flags [zeroed], size [four ones for now]
+    Uint8List encodedTag = Uint8List.fromList([[0x49, 0x44, 0x33, 3, 0, 0, 1, 1, 1, 1]);
+    int tagSize = 0;
 
-  // }
+    data.forEach((key, val) => {
+      final EncodedString encodedFrameCode = EncodedString(revAssocMap[key]);
+      final EncodedString encodedFrameVal = EncodedString(val);
+      final Uint8List frameCodeBytes = encodedFrameCode.writeableBytes();
+      final Uint8List frameSizeBytes = ID3.encodeFrameSize(encodedFrameVal);
+      final Uint8List frameFlags = Uint8List.fromList([0x00, 0x00]);
+      final Uint8List frameValueBytes = encodedFrameVal.writeableBytes();
+
+      encodedTag = [
+        ...encodedTag,
+        ...frameCodeBytes,
+        ...frameSizeBytes,
+        ...frameFlags,
+        ...frameValueBytes
+      ]
+    });
+
+  }
 
 }
 
@@ -101,6 +121,14 @@ class EncodedString {
       return Uint8List.fromList([0x00]);
     } else {
       return Uint8List.fromList([0x01, 0xfe, 0xff]);
+    }
+  }
+
+  int frameSize() {
+    if (isUtf8Encoded) {
+      return bytes.length + 1;
+    } else {
+      return bytes.length + 3;
     }
   }
 
