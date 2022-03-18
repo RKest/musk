@@ -70,9 +70,10 @@ class Tag {
       final EncodedString encodedFrameCode = EncodedString(revAssocMap[key]);
       final EncodedString encodedFrameVal = EncodedString(val);
       final Uint8List frameCodeBytes = encodedFrameCode.writeableBytes();
-      final Uint8List frameSizeBytes = ID3.encodeFrameSize(encodedFrameVal);
+      final Uint8List frameSizeBytes = ID3.encodeFrameSize(encodedFrameVal.frameSize());
       final Uint8List frameFlags = Uint8List.fromList([0x00, 0x00]);
       final Uint8List frameValueBytes = encodedFrameVal.writeableBytes();
+      tagSize += (10 + encodedFrameVal.frameSize());
 
       encodedTag = [
         ...encodedTag,
@@ -80,9 +81,15 @@ class Tag {
         ...frameSizeBytes,
         ...frameFlags,
         ...frameValueBytes
-      ]
+      ];
     });
 
+    final Uint8List encodedTagSize = ID3.encodedTagSize(tagSize);
+    for (int i = 0; i < 4; i++) {
+      encodedTag[i + 6] = encodedTagSize[i];
+    }
+
+    return encodedTag;
   }
 
 }
