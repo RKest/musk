@@ -102,27 +102,38 @@ Widget trackListWidget() {
           itemCount: trackSnap.data?.length,
           itemBuilder: (context, index) {
             final Tag tag = trackSnap.data![index];
-            return Column(children: [
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   SizedBox(
-                    height: 35.0,
-                    width: 35.0,
+                    height: 80.0,
+                    width: 80.0,
                     child: getSongImage(tag),
                   ),
                   Column(
+                    mainAxisSize: MainAxisSize.max,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        tag.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8.0, 16.0, 0.0, 0.0),
+                        child: Text(
+                          tag.title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 30,
+                          ),
                         ),
                       ),
-                      Text(tag.artist)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8.0, 0.0, 0.0, 0.0),
+                        child: Text(tag.artist),
+                      )
                     ],
                   ),
                 ],
