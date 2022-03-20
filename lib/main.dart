@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:audiotagger/models/tag.dart';
 import 'package:flutter/material.dart';
 import 'multipart.dart';
 import 'utils.dart';
+import 'id3.dart';
 
 void main() {
   runApp(const MyApp());
@@ -24,17 +24,6 @@ class _MyAppState extends State<MyApp> {
   final myController = TextEditingController();
 
   startServer() async {
-    var ents = await Utils.scanDir(await Utils.getFilePath);
-
-    for (FileSystemEntity ent in ents) {
-      final bool isFile = await FileSystemEntity.isFile(ent.path);
-      if (isFile && ent.path.endsWith('.mp3')) {
-        print('Ent: $ent');
-        final Tag tags = await Utils.getTags(ent.path);
-        print('Tags: $tags');
-      }
-    }
-
     var server = await HttpServer.bind(InternetAddress.anyIPv4, 8080);
     String ip = await Utils.localIp ?? "Err while getting the ip";
     setState(() {
@@ -59,17 +48,10 @@ class _MyAppState extends State<MyApp> {
             ..close();
         }
       } else if (request.method == "POST") {
-        bool isFirst = true;
-        String fileName = "Err";
-        Stream<Uint8List> brodcast = request.asBroadcastStream();
-        await for (Uint8List event in brodcast) {
-          if (isFirst) {
-            fileName = Multipart.getFilename(event);
-            print('Starting: $fileName');
-            isFirst = false;
-          }
-          Utils.saveToFile(fileName, event);
-        }
+        final Uint8List data = Uint8List.fromList(await request.expand((el) => el).toList());
+        final int dataStartIndex = Multipart.mp3DataStartIndex(data);
+        final String fileName = Multipart.getFilename(data);
+        await Utils.saveToFile(fileName, data.sublist(dataStartIndex));
         print("Done");
         request.response.close();
       }
@@ -85,34 +67,90 @@ class _MyAppState extends State<MyApp> {
           backgroundColor: Colors.cyan,
           title: const Text("Hello world!"),
         ),
-        body: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: <Widget>[
-            TextField(
-              controller: myController,
-            ),
-            TextButton(
-              onPressed: () {
-                // Utils.saveToFile(myController.text);
-              },
-              child: const Text("Save to file"),
-            ),
-            TextButton(
-              onPressed: () {
-                // Utils.readFromFile().then((contents) {
-                //   setState(() {
-                //     fileContents = contents;
-                //   });
-                // });
-              },
-              child: const Text("Read from file"),
-            ),
-            Text(fileContents),
-            Text(listeningAddress),
-          ],
+        body: trackListWidget(),
+        floatingActionButton: const FloatingActionButton(
+          onPressed: deleteAll
         ),
       ),
     );
+  }
+}
+
+Future<List<Tag>> getTags() async {
+  List<Tag> ret = [];
+  var ents = await Utils.scanDir(await Utils.getFilePath);
+
+  for (FileSystemEntity ent in ents) {
+    final bool isFile = await FileSystemEntity.isFile(ent.path);
+    if (isFile && ent.path.endsWith('.mp3')) {
+      final Uint8List mp3Bytes = await File(ent.path).readAsBytes();
+      final Tag tag = Tag.fromBytes(mp3Bytes);
+      ret.add(tag);
+    }
+  }
+  return ret;
+}
+
+Widget trackListWidget() {
+  return FutureBuilder(
+    builder: (context, AsyncSnapshot<List<Tag>> trackSnap) {
+      if (trackSnap.connectionState == ConnectionState.none ||
+          !trackSnap.hasData) {
+        return Container();
+      }
+      return ListView.builder(
+          itemCount: trackSnap.data?.length,
+          itemBuilder: (context, index) {
+            final Tag tag = trackSnap.data![index];
+            return Column(children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 35.0,
+                    width: 35.0,
+                    child: getSongImage(tag),
+                  ),
+                  Column(
+                    children: [
+                      Text(
+                        tag.title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                      Text(tag.artist)
+                    ],
+                  ),
+                ],
+              ),
+            ]);
+          });
+    },
+    future: getTags(),
+  );
+}
+
+Image getSongImage(Tag tag){
+  if (tag.picture != null && tag.picture!.isNotEmpty){
+    print('PICTURE: ${String.fromCharCodes(tag.picture!)}');
+    return Image.memory(tag.picture!);
+  } else {
+    return Image.asset("assets/def.png");
+  }
+}
+
+void deleteAll() async {
+  var ents = await Utils.scanDir(await Utils.getFilePath);
+
+  for (FileSystemEntity ent in ents) {
+    final bool isFile = await FileSystemEntity.isFile(ent.path);
+    if (isFile && ent.path.endsWith('.mp3')) {
+      print("Deleted ${ent.path}");
+      await File(ent.path).delete();
+    }
   }
 }

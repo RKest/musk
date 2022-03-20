@@ -1,97 +1,119 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 
 class Tag {
-  static Map<String, String> assocMap = {
+  static const Map<String, String> _assocMap = {
     "TIT2": "title",
     "TPE1": "author",
     "TALB": "album",
     "APIC": "picture"
   };
 
-  static Map<String, String> revAssocMap = {
+  static const Map<String, String> _revAssocMap = {
     "title": "TIT2",
     "author": "TPE1",
     "album": "TALB",
     "picture": "APIC"
   };
 
-  Map<String, String> data = {
+  final Map<String, String> _data = {
     "title": "Unknown",
     "author": "Unknown",
     "album": "Unknown"
   };
 
-  Uint8List picture = Uint8List(0);
+  String get title {
+    return _data["title"]!;
+  }
 
-  Tag.fromBytes(Uint8List bytes){
-    assert(bytes.sublist(0, 5) == [0x49, 0x44, 0x33, 3, 0]);
-    final int tagSize = ID3.decodeTagSize(bytes.sublist(6, 10));
-    // ignore: unused_local_variable
-    final int noTrailingBytes = ID3.numberOfTrailingBytes(bytes, tagSize);
-    int i = 10;
-    while (i < tagSize){
-      if (bytes.sublist(i, i + 4).every((el) => el == 0x00)){
-        break;
-      }
-      final String frameCode = String.fromCharCodes(bytes.sublist(i, i + 4));
-		  i += 4;
+  String get artist {
+    return _data["author"]!;
+  }
 
-		  final int frameSize = ID3.decodeFrameSize(bytes.sublist(i, i + 4));
-		  i += 4;
+  String get album {
+    return _data["album"]!;
+  }
 
-		  //Ignoring the flags
-		  i += 2;
+  Uint8List? picture;
 
-      if(assocMap.containsKey(frameCode)){
-        if (frameCode == "picture"){
-          picture = bytes.sublist(i, i + frameSize);
-        }else{
-          final String frameValue = EncodedString.decodeString(bytes.sublist(i, i + frameSize));
-          data[assocMap[frameCode]!] = frameValue;
+  Tag.fromBytes(Uint8List bytes) {
+    if (listEquals(bytes.sublist(0, 5), [73, 68, 51, 3, 0])) {
+      final int tagSize = ID3.decodeTagSize(bytes.sublist(6, 10));
+      // ignore: unused_local_variable
+      // final int noTrailingBytes = ID3.numberOfTrailingBytes(bytes, tagSize);
+      int i = 10;
+      while (i <= tagSize) {
+        if (bytes.sublist(i, i + 4).every((el) => el == 0x00)) {
+          break;
         }
+        final String frameCode = String.fromCharCodes(bytes.sublist(i, i + 4));
+        i += 4;
+
+        final int frameSize = ID3.decodeFrameSize(bytes.sublist(i, i + 4));
+        i += 4;
+
+        //Ignoring the flags
+        i += 2;
+
+        if (_assocMap.containsKey(frameCode)) {
+          if (frameCode == "APIC") {
+            final int imageSliceOffPoint =
+                ID3.getImageDataSliceOffPoint(bytes.sublist(i, i + frameSize));
+            picture = bytes.sublist(i + imageSliceOffPoint, i + frameSize);
+            assert(picture?[0] == 0xff);
+          } else {
+            final String frameValue =
+                EncodedString.decodeString(bytes.sublist(i, i + frameSize));
+            _data[_assocMap[frameCode]!] = frameValue;
+          }
+        }
+        i += frameSize;
       }
     }
   }
 
-  Tag.fromValues(String? title, String? author, String? album, Uint8List? picture) 
-  {
+  Tag.fromValues(
+      [String? title, String? author, String? album, Uint8List? picture]) {
     picture = picture;
-    data["title"] = title ?? "Unknown";
-    data["author"] = author ?? "Unknown";
-    data["album"] = album ?? "Unknown";
+    _data["title"] = title ?? "Unknown";
+    _data["author"] = author ?? "Unknown";
+    _data["album"] = album ?? "Unknown";
   }
 
-  Uint8List encode(){
+  Uint8List encode() {
     //I, D, 3, ver 3, rev 0, flags [zeroed], size [four ones for now]
-    Uint8List encodedTag = Uint8List.fromList([[0x49, 0x44, 0x33, 3, 0, 0, 1, 1, 1, 1]);
+    Uint8List encodedTag =
+        Uint8List.fromList([0x49, 0x44, 0x33, 3, 0, 0, 1, 1, 1, 1]);
     int tagSize = 0;
 
-    data.forEach((key, val) => {
-      final EncodedString encodedFrameCode = EncodedString(revAssocMap[key]);
+    _data.forEach((key, val) {
+      final EncodedString encodedFrameCode = EncodedString(_revAssocMap[key]!);
       final EncodedString encodedFrameVal = EncodedString(val);
       final Uint8List frameCodeBytes = encodedFrameCode.writeableBytes();
-      final Uint8List frameSizeBytes = ID3.encodeFrameSize(encodedFrameVal.frameSize());
+      final Uint8List frameSizeBytes =
+          ID3.encodeFrameSize(encodedFrameVal.frameSize());
       final Uint8List frameFlags = Uint8List.fromList([0x00, 0x00]);
+      final Uint8List frameValueEncoding = encodedFrameVal.headerBytes();
       final Uint8List frameValueBytes = encodedFrameVal.writeableBytes();
-      tagSize += (10 + encodedFrameVal.frameSize());
+      tagSize += (10 + encodedFrameVal.frameSize() + frameValueEncoding.length);
 
-      encodedTag = [
+      encodedTag = Uint8List.fromList([
         ...encodedTag,
         ...frameCodeBytes,
         ...frameSizeBytes,
         ...frameFlags,
+        ...frameValueEncoding,
         ...frameValueBytes
-      ];
+      ]);
     });
 
-    final Uint8List encodedTagSize = ID3.encodedTagSize(tagSize);
+    final Uint8List encodedTagSize = ID3.encodeTagSize(tagSize);
     for (int i = 0; i < 4; i++) {
       encodedTag[i + 6] = encodedTagSize[i];
     }
 
     return encodedTag;
   }
-
 }
 
 class EncodedString {
@@ -170,7 +192,7 @@ class ID3 {
     int acc = 0;
 
     for (int i = 0; i < 4; i++) {
-      acc += bytes[3 - i] >> (7 * i);
+      acc += bytes[3 - i] << (7 * i);
     }
     return acc;
   }
@@ -180,7 +202,7 @@ class ID3 {
     int acc = 0;
 
     for (int i = 0; i < 4; i++) {
-      acc += bytes[3 - i] >> (8 * i);
+      acc += bytes[3 - i] << (8 * i);
     }
 
     return acc;
@@ -204,19 +226,36 @@ class ID3 {
     return bytes;
   }
 
-  static int numberOfTrailingBytes(Uint8List bytes, int size){
-    	int count = 0;
-	    final int actualSize = size + 9;
-	    for (var i = actualSize - 1; i != 0; i--) {
-		    if (bytes[i] == 0x00){
-			    count++;
-        }
-		    else{
-
-			    break;
-        }
+  static int numberOfTrailingBytes(Uint8List bytes, int size) {
+    int count = 0;
+    final int actualSize = size + 9;
+    for (var i = actualSize - 1; i != 0; i--) {
+      if (bytes[i] == 0x00) {
+        count++;
+      } else {
+        break;
       }
-      return count;
+    }
+    return count;
   }
 
+  static int getImageDataSliceOffPoint(Uint8List bytes) {
+    int textEncoding = bytes[0];
+    int i = 1;
+    while (bytes[i] != 0) {
+      i += 1;
+    }
+    //Ignoring Picture Type
+    i += 1;
+    if (textEncoding == 0) {
+      while (bytes[i] != 0) {
+        i += 1;
+      }
+    } else {
+      while (bytes[i] != 0 || bytes[i + 1] != 0) {
+        i += 2;
+      }
+    }
+    return i + 1;
+  }
 }

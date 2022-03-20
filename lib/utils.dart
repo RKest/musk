@@ -1,15 +1,12 @@
 import 'dart:typed_data';
 
-import 'package:audiotagger/models/tag.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:network_info_plus/network_info_plus.dart';
-import 'package:audiotagger/audiotagger.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'dart:io';
 
 class Utils
 {
-  static final tagger = Audiotagger();
   static Future<String?> get localIp async {
     final info = NetworkInfo();
     return info.getWifiIP();
@@ -29,8 +26,13 @@ class Utils
     return await rootBundle.loadString('assets/$path');
   }
 
+  static Future<ByteData> loadAssetBytes(String path) async {
+    return rootBundle.load('assets/$path');
+  }
+
   static Future<File> saveToFile(String path, Uint8List data) async {
     final file = await getFile(path);
+    print('PATH: ${file.path}');
     return file.writeAsBytes(data, mode: FileMode.append);
   }
 
@@ -44,11 +46,6 @@ class Utils
     return dir.list().toList();
   }
 
-  static Future<Tag> getTags(String path) async {
-    final Tag? tags = await tagger.readTags(path: path);
-    return tags ?? Tag();
-  }
-
   // static Future<String> readFromFile() async {
   //   try {
   //     final file = await getFile;
@@ -59,3 +56,4 @@ class Utils
   //   }
   // }
 }
+
