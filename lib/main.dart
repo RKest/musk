@@ -62,9 +62,23 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     startServer();
     return MaterialApp(
+      theme: ThemeData(
+        colorScheme: const ColorScheme(
+          primary: Colors.black87,
+          secondary: Color.fromRGBO(15, 60, 180, 1),
+          brightness: Brightness.dark,
+          onPrimary: Colors.white70,
+          onSecondary: Colors.white70,
+          error: Colors.red,
+          onError: Colors.white70,
+          background: Colors.black87,
+          onBackground: Colors.white70,
+          surface: Colors.black87,
+          onSurface: Colors.white70
+        ),
+      ),
       home: Scaffold(
         appBar: AppBar(
-          backgroundColor: Colors.cyan,
           title: const Text("Hello world!"),
         ),
         body: trackListWidget(),
@@ -147,7 +161,6 @@ Widget trackListWidget() {
 
 Image getSongImage(Tag tag){
   if (tag.picture != null && tag.picture!.isNotEmpty){
-    print('PICTURE: ${String.fromCharCodes(tag.picture!)}');
     return Image.memory(tag.picture!);
   } else {
     return Image.asset("assets/def.png");
