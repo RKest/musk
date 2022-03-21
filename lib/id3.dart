@@ -35,8 +35,10 @@ class Tag {
   }
 
   Uint8List? picture;
+  String mp3Path;
 
-  Tag.fromBytes(Uint8List bytes) {
+  Tag.fromBytes(Uint8List bytes, this.mp3Path)
+  {
     if (listEquals(bytes.sublist(0, 5), [73, 68, 51, 3, 0])) {
       final int tagSize = ID3.decodeTagSize(bytes.sublist(6, 10));
       // ignore: unused_local_variable
@@ -72,7 +74,7 @@ class Tag {
     }
   }
 
-  Tag.fromValues(
+  Tag.fromValues(this.mp3Path,
       [String? title, String? author, String? album, Uint8List? picture]) {
     picture = picture;
     _data["title"] = title ?? "Unknown";
