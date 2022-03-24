@@ -88,7 +88,13 @@ class _MyAppState extends State<MyApp> {
         appBar: AppBar(
           title: const Text("Hello world!"),
         ),
-        body: trackListWidget(mainContext),
+        body: Column(
+          children: [
+            trackListWidget(mainContext),
+            CurrentTackPanel(),
+          ]
+        ),
+        
         floatingActionButton: const FloatingActionButton(onPressed: deleteAll),
       ),
     );
@@ -108,24 +114,6 @@ Future<List<Tag>> getTags() async {
     }
   }
   return ret;
-}
-
-Widget trackListWidget(BuildContext mainContext) {
-  return FutureBuilder(
-    builder: (context, AsyncSnapshot<List<Tag>> trackSnap) {
-      if (trackSnap.connectionState == ConnectionState.none ||
-          !trackSnap.hasData) {
-        return Container();
-      }
-      return ListView.builder(
-          itemCount: trackSnap.data?.length,
-          itemBuilder: (context, index) {
-            final Tag tag = trackSnap.data![index];
-            return MainListTrack(tag: tag);
-          });
-    },
-    future: getTags(),
-  );
 }
 
 class MainListTrack extends StatelessWidget {
@@ -176,69 +164,81 @@ class MainListTrack extends StatelessWidget {
   }
 }
 
-void floatingMediaWidget(BuildContext externContext) {
+class CurrentTackPanel extends StatelessWidget {
+  const CurrentTackPanel({Key? key}) : super(key: key);
   final tagId = getIt.get<TagIdentity>();
   final audioPlayer = getIt.get<AudioPlayer>();
-  OverlayEntry entry = OverlayEntry(
-    builder: (BuildContext context) => StreamBuilder(
-      stream: tagId.stream$,
-      builder: (context, AsyncSnapshot<Tag> snapshot) {
-        final tag = snapshot.data!;
-        return Positioned(
-          height: 100.0,
-          bottom: 40.0,
-          left: 40.0,
-          child: ElevatedButton(
-            child: Icon(Icons.abc),
-            onPressed: (){},
-          ),
-          // child: Row(
-          //   children: [
-          //     Column(
-          //       mainAxisSize: MainAxisSize.max,
-          //       mainAxisAlignment: MainAxisAlignment.center,
-          //       crossAxisAlignment: CrossAxisAlignment.start,
-          //       children: [
-          //         Padding(
-          //           padding: const EdgeInsets.fromLTRB(8.0, 16.0, 0.0, 0.0),
-          //           child: Text(
-          //             tag.title,
-          //             style: const TextStyle(
-          //               fontWeight: FontWeight.bold,
-          //               fontSize: 30,
-          //             ),
-          //           ),
-          //         ),
-          //         Padding(
-          //           padding: const EdgeInsets.fromLTRB(8.0, 0.0, 0.0, 0.0),
-          //           child: Text(tag.artist),
-          //         )
-          //       ],
-          //     ),
-          //     IconButton(
-          //       onPressed: (){}, 
-          //       icon: const Icon(Icons.fast_rewind)
-          //     ),
-          //     IconButton(
-          //       onPressed: audioPlayer.pause, 
-          //       icon: const Icon(Icons.pause)
-          //     ),
-          //     IconButton(
-          //       onPressed: (){}, 
-          //       icon: const Icon(Icons.fast_forward)
-          //     ),
-          //   ],
-          // ),
-        );
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder(
+    stream: tagId.stream$,
+    builder: (context, AsyncSnapshot<Tag> snapshot) {
+      final tag = snapshot.data!;
+      return Positioned(
+        height: 100.0,
+        bottom: 40.0,
+        left: 40.0,
+        child: Row(
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8.0, 16.0, 0.0, 0.0),
+                  child: Text(
+                    tag.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 30,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8.0, 0.0, 0.0, 0.0),
+                  child: Text(tag.artist),
+                )
+              ],
+            ),
+            IconButton(
+              onPressed: (){}, 
+              icon: const Icon(Icons.fast_rewind)
+            ),
+            IconButton(
+              onPressed: audioPlayer.pause, 
+              icon: const Icon(Icons.pause)
+            ),
+            IconButton(
+              onPressed: (){}, 
+              icon: const Icon(Icons.fast_forward)
+            ),
+          ],
+        ),
+      );
+    }
+  )
+}
+
+Widget trackListWidget(BuildContext mainContext) {
+  return FutureBuilder(
+    builder: (context, AsyncSnapshot<List<Tag>> trackSnap) {
+      if (trackSnap.connectionState == ConnectionState.none ||
+          !trackSnap.hasData) {
+        return Container();
       }
-    )
+      return ListView.builder(
+          itemCount: trackSnap.data?.length,
+          itemBuilder: (context, index) {
+            final Tag tag = trackSnap.data![index];
+            return MainListTrack(tag: tag);
+          });
+    },
+    future: getTags(),
   );
-  final overlay = Overlay.of(externContext);
-  overlay?.insert(entry);
 }
 
 void playTrack(Tag tag, BuildContext ctx){
-  print(tag.mp3Path);
   final audioPlayer = getIt.get<AudioPlayer>();
   final tagId = getIt.get<TagIdentity>();
   tagId.changeTrack(tag);

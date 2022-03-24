@@ -1,22 +1,46 @@
-// const FORM_ID = 'f';
-// const FILE_INP_ID = 'i';
+const DROP_AREA_ID = 'drop-area';
 
-// (function(){
-// 	const form = document.getElementById(FORM_ID);
-// 	const fileInp = document.getElementById(FILE_INP_ID);
-// 	form.addEventListener('submit', async (ev) => {
-// 		ev.preventDefault();
-// 		const formData = new FormData();
-// 		const file = fileInp.files[0];
-// 		formData.append('file', file);
+(function(){
+    const dropArea = document.getElementById(DROP_AREA_ID);
 
-// 		const res = await fetch(ev.target.action, {
-// 			headers: {
-// 				'Content-Type': 'multipart/form-data',
-// 			},
-// 			method: 'POST',
-// 			body: formData
-// 		});
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
 
-// 	})
-// })();
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, (_) => 
+            dropArea.classList.add('highlight')
+        );
+    });
+      
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, (_) => 
+            dropArea.classList.remove('highlight')
+        );
+    });
+
+    dropArea.addEventListener('drop', handleDrop)
+})();
+
+const handleDrop = (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    [...files].forEach(sendFile);
+}
+
+const sendFile = async () => {
+    let formData = new FormData()
+  
+    formData.append('file', file)
+  
+    const res = await fetch(e.target.action, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+        method: 'POST',
+        body: formData
+    });
+}

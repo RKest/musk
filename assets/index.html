@@ -9,9 +9,11 @@
 </head>
 <body>
 	<h1>Be well king!</h1>
-	<form action="{{}}" method="post" enctype="multipart/form-data" id="f">
-		<input type="file" name="file" accept = ".mp3" id="i"/>
-		<input type="submit" value="Send it">
-	</form>
+	<div id="drop-area" action="{{}}">
+		<form>
+			<input type="file" name="file" accept = ".mp3" id="i"/>
+			<input type="submit" value="Send it">
+		</form>
+	</div>
 </body>
 </html>
