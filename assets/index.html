@@ -5,15 +5,17 @@
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<script src="script.js" defer></script>
+    <link rel="stylesheet" href="style.css">
 	<title>Document</title>
 </head>
 <body>
-	<h1>Be well king!</h1>
-	<div id="drop-area" action="{{}}">
-		<form>
-			<input type="file" name="file" accept = ".mp3" id="i"/>
-			<input type="submit" value="Send it">
-		</form>
-	</div>
+    <div id="drop-area" action="{{}}">
+        <form class="my-form">
+          <p>Upload multiple files with the file dialog or by dragging and dropping images onto the dashed region</p>
+          <input type="file" id="fileElem" multiple accept="image/*">
+          <label class="button" for="fileElem">Select some files</label>
+        </form>
+        <progress id="progress-bar" max=100 value=0></progress>
+    </div>
 </body>
 </html>
