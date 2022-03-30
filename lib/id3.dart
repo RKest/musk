@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 class Tag {
   static const Map<String, String> _assocMap = {
@@ -32,6 +33,14 @@ class Tag {
 
   String get album {
     return _data["album"]!;
+  }
+
+  Image get getImage {
+    if (picture != null && picture!.isNotEmpty) {
+      return Image.memory(picture!);
+    } else {
+      return Image.asset("assets/def.png");
+    }
   }
 
   Uint8List? picture;
