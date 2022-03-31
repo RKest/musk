@@ -32,7 +32,6 @@ class Utils
 
   static Future<File> saveToFile(String path, Uint8List data) async {
     final file = await getFile(path);
-    print('PATH: ${file.path}');
     return file.writeAsBytes(data, mode: FileMode.append);
   }
 
@@ -44,6 +43,14 @@ class Utils
   static Future<List<FileSystemEntity>> scanDir(String path) async {
     final dir = Directory(path);
     return dir.list().toList();
+  }
+
+  static void writeAtPostion(String path, Uint8List data, int position) async {
+    final File fileForWriting = File(path);
+    final RandomAccessFile raf = await file.open(mode: FileMode.append);
+    final RandomAccessFile f1 = await raf.setPosition(position);
+    await f1.writeFrom(data);
+    await f1.close();
   }
 
   // static Future<String> readFromFile() async {
