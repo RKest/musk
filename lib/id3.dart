@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import 'utils.dart';
 
 class Tag {
   static const Map<String, String> _assocMap = {
@@ -118,12 +121,45 @@ class Tag {
       ]);
     });
 
+    if (picture != null){
+      final EncodedString encodedFrameCode = EncodedString('APIC');
+      final Uint8List frameCodeBytes = encodedFrameCode.writeableBytes();
+      final Uint8List frameSizeBytes = ID3.encodeFrameSize(picture!.length);
+      final Uint8List frameFlags = Uint8List.fromList([0x00, 0x00]);
+      tagSize += (10 + picture!.length);
+      
+      encodedTag = Uint8List.fromList([
+        ...encodedTag,
+        ...frameCodeBytes,
+        ...frameSizeBytes,
+        ...frameFlags,
+        ...picture!
+      ]);
+    }
+
     final Uint8List encodedTagSize = ID3.encodeTagSize(tagSize);
     for (int i = 0; i < 4; i++) {
       encodedTag[i + 6] = encodedTagSize[i];
     }
 
     return encodedTag;
+  }
+
+  static void updateWithNewValues(Tag oldTag, Tag newTag) async {
+    final String pathToChange = oldTag.mp3Path;
+    final Uint8List oldTagBytes = await File(pathToChange).readAsBytes();
+    final int oldTagSize = ID3.decodeTagSize(oldTagBytes.sublist(6,10)) + 10; // + 10 for the 10 bytes before actual tag data
+    
+    final Uint8List newEncodedTag = newTag.encode();
+    final int newEncodedTagSize = newEncodedTag.length;
+
+    if (newEncodedTagSize > oldTagSize) {
+      Utils.writeAtPostion(pathToChange, newEncodedTag, 0);
+    } else {
+      final File newFile = File(pathToChange);
+      await newFile.writeAsBytes(newEncodedTag, mode: FileMode.write);
+      await newFile.writeAsBytes(oldTagBytes.sublist(oldTagSize), mode: FileMode.append);
+    }
   }
 }
 
@@ -237,18 +273,22 @@ class ID3 {
     return bytes;
   }
 
-  static int numberOfTrailingBytes(Uint8List bytes, int size) {
-    int count = 0;
-    final int actualSize = size + 9;
-    for (var i = actualSize - 1; i != 0; i--) {
-      if (bytes[i] == 0x00) {
-        count++;
-      } else {
-        break;
-      }
-    }
-    return count;
-  }
+  // ----------------------------------------------
+  // MOST LIKELY DEPRICATED
+  // ----------------------------------------------
+
+  // static int numberOfTrailingBytes(Uint8List bytes, int size) {
+  //   int count = 0;
+  //   final int actualSize = size + 9;
+  //   for (var i = actualSize - 1; i != 0; i--) {
+  //     if (bytes[i] == 0x00) {
+  //       count++;
+  //     } else {
+  //       break;
+  //     }
+  //   }
+  //   return count;
+  // }
 
   static int getImageDataSliceOffPoint(Uint8List bytes) {
     int textEncoding = bytes[0];
