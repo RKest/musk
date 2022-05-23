@@ -32,7 +32,11 @@ function handleDrop(e) {
     const dt = e.dataTransfer;
     const files = dt.files;
     initializeProgress(files.length);
-    [...files].forEach(sendFile);
+    handleFiles(files);
+}
+
+function handleFiles(files) {
+  ([...files]).forEach(uploadFile)
 }
 
 function sendFile(file) {

@@ -45,15 +45,5 @@ class Utils
     final dir = Directory(path);
     return dir.list().toList();
   }
-
-  // static Future<String> readFromFile() async {
-  //   try {
-  //     final file = await getFile;
-  //     final String fileContents = await file.readAsString();
-  //     return fileContents;
-  //   } catch (e) {
-  //     return "ERROR: $e";
-  //   }
-  // }
 }
 
