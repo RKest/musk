@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'utils.dart';
 
@@ -26,6 +27,33 @@ class Tag {
     "album": "Unknown"
   };
 
+  set title(String newVal) {
+    _data["title"] = newVal;
+  }
+
+  set artist(String newVal) {
+    _data["author"] = newVal;
+  }
+
+  set album(String newVal) {
+    _data["album"] = newVal;
+  }
+
+  setPicture(XFile pictureFile) async {
+    final String mime = pictureFile.mimeType ?? "image/${pictureFile.name.split('.').last}";
+    final EncodedString encodedMimetype = EncodedString(mime);
+    final Uint8List pictureBinData = await pictureFile.readAsBytes();
+    final Uint8List bytes = Uint8List.fromList([
+      ...encodedMimetype.headerBytes(), 
+      ...encodedMimetype.writeableBytes(),
+      ...encodedMimetype.nullTerminator(),
+      0x03, // <-- picture type of "Front Cover",
+      0x00, // <-- description which is empty
+      ...pictureBinData
+    ]);
+    picture = bytes;
+  }
+
   String get title {
     return _data["title"]!;
   }
@@ -38,9 +66,11 @@ class Tag {
     return _data["album"]!;
   }
 
+  int _imageCutoffPoint = 0;
+
   Image get getImage {
     if (picture != null && picture!.isNotEmpty) {
-      return Image.memory(picture!);
+      return Image.memory(picture!.sublist(_imageCutoffPoint));
     } else {
       return Image.asset("assets/def.png");
     }
@@ -73,8 +103,8 @@ class Tag {
           if (frameCode == "APIC") {
             final int imageSliceOffPoint =
                 ID3.getImageDataSliceOffPoint(bytes.sublist(i, i + frameSize));
-            picture = bytes.sublist(i + imageSliceOffPoint, i + frameSize);
-            assert(picture?[0] == 0xff);
+            _imageCutoffPoint = imageSliceOffPoint;
+            picture = bytes.sublist(i, i + frameSize);
           } else {
             final String frameValue =
                 EncodedString.decodeString(bytes.sublist(i, i + frameSize));
@@ -153,7 +183,7 @@ class Tag {
     final Uint8List newEncodedTag = newTag.encode();
     final int newEncodedTagSize = newEncodedTag.length;
 
-    if (newEncodedTagSize > oldTagSize) {
+    if (newEncodedTagSize < oldTagSize) {
       Utils.writeAtPostion(pathToChange, newEncodedTag, 0);
     } else {
       final File newFile = File(pathToChange);
@@ -197,6 +227,14 @@ class EncodedString {
       return Uint8List.fromList([0x00]);
     } else {
       return Uint8List.fromList([0x01, 0xfe, 0xff]);
+    }
+  }
+
+  Uint8List nullTerminator() {
+    if (isUtf8Encoded) {
+      return Uint8List.fromList([0x00]);
+    } else {
+      return Uint8List.fromList([0x00, 0x00]);
     }
   }
 
@@ -272,23 +310,6 @@ class ID3 {
     bytes[3] = (size & 0x000000ff);
     return bytes;
   }
-
-  // ----------------------------------------------
-  // MOST LIKELY DEPRICATED
-  // ----------------------------------------------
-
-  // static int numberOfTrailingBytes(Uint8List bytes, int size) {
-  //   int count = 0;
-  //   final int actualSize = size + 9;
-  //   for (var i = actualSize - 1; i != 0; i--) {
-  //     if (bytes[i] == 0x00) {
-  //       count++;
-  //     } else {
-  //       break;
-  //     }
-  //   }
-  //   return count;
-  // }
 
   static int getImageDataSliceOffPoint(Uint8List bytes) {
     int textEncoding = bytes[0];

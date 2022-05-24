@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:get_it/get_it.dart';
-import 'package:marquee/marquee.dart';
+import 'package:image_picker/image_picker.dart';
 import 'utils.dart';
 import 'id3.dart';
 import 'state.dart';
@@ -14,6 +14,7 @@ void main() {
   GetIt.I.registerSingleton<TagIdentity>(TagIdentity());
   GetIt.I.registerSingleton<AudioPlayer>(AudioPlayer());
   GetIt.I.registerSingleton<TracksIdentity>(TracksIdentity());
+  GetIt.I.registerSingleton<ImagePicker>(ImagePicker());
   runApp(const MyApp());
 }
 
@@ -78,6 +79,13 @@ Stream<List<Tag>> getTags() async* {
     if (isFile && ent.path.endsWith('.mp3')) {
       final Uint8List mp3Bytes = await File(ent.path).readAsBytes();
       final Tag tag = Tag.fromBytes(mp3Bytes, ent.path);
+      // for (var i = 0; i < 400; i+=100){
+      //   print(mp3Bytes.sublist(i, i + 100));
+      // }
+      // var k = tag.encode();
+      // for (var i = 0; i < 400; i+=100){
+      //   print(k.sublist(i, i + 100));
+      // }
       ret.add(tag);
       yield ret;
     }
@@ -108,15 +116,14 @@ class MainListTrack extends StatelessWidget {
             ),
             MainTrackListInfo(tag: tag),
             IconButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => TagChangePanel(tag: tag)),
-                );
-              },
-              icon: const Icon(Icons.more_vert)
-            ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => TagChangePanel(tag: tag)),
+                  );
+                },
+                icon: const Icon(Icons.more_vert)),
           ]),
     );
   }
@@ -231,9 +238,7 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
                       IconButton(
                           onPressed: () {},
                           icon: const Icon(Icons.fast_rewind)),
-                      IconButton(
-                        onPressed: playPasue, 
-                        icon: playPauseIcon()),
+                      IconButton(onPressed: playPasue, icon: playPauseIcon()),
                       IconButton(
                           onPressed: () {},
                           icon: const Icon(Icons.fast_forward)),
@@ -242,7 +247,8 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 16.0),
                     child: Slider(
-                        value: currentProgress.toDouble() / totalTrackDuration.toDouble(),
+                        value: currentProgress.toDouble() /
+                            totalTrackDuration.toDouble(),
                         onChanged: (change) {}),
                   )
                 ],
@@ -263,26 +269,30 @@ class CurrentTrackPanelInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8.0, 16.0, 0.0, 0.0),
-          child: Text(
-            tag.title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 30,
+    return Expanded(
+      flex: 1,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8.0, 16.0, 0.0, 0.0),
+            child: Text(
+              tag.title,
+              maxLines: 1,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
             ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8.0, 0.0, 0.0, 0.0),
-          child: Text(tag.artist),
-        )
-      ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8.0, 0.0, 0.0, 0.0),
+            child: Text(tag.artist),
+          )
+        ],
+      ),
     );
   }
 }
@@ -304,36 +314,169 @@ class _TrackListWidgetState extends State<TrackListWidget> {
   @override
   Widget build(BuildContext context) {
     loadTags();
-    return StreamBuilder(
-        stream: tracksId.stream$,
-        builder: (context, AsyncSnapshot<List<Tag>> snapshot) {
-          final tracks = snapshot.data;
-          if (tracks == null || tracks.isEmpty) {
-            return Container();
-          }
-          return ListView.builder(
-              itemCount: tracks.length,
-              shrinkWrap: true,
-              itemBuilder: (context, index) {
-                final Tag tag = tracks[index];
-                return MainListTrack(tag: tag);
-              });
-        });
+    return Column(
+      children: [
+        Row(
+          children: [
+            SizedBox(
+              width: 50,
+              height: 50,
+              child: IconButton(
+                icon: const Icon(Icons.sort_by_alpha),
+                onPressed: () {
+                  tracksId.setTracks(tracksId.current,
+                      optionsEnum: TrackOrderOptionsEnum.alphabetical);
+                },
+              ),
+            ),
+            SizedBox(
+              width: 50,
+              height: 50,
+              child: IconButton(
+                icon: const Icon(Icons.shuffle),
+                onPressed: () {
+                  tracksId.setTracks(tracksId.current,
+                      optionsEnum: TrackOrderOptionsEnum.random);
+                },
+              ),
+            ),
+            SizedBox(
+              width: 50,
+              height: 50,
+              child: IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {
+                  tracksId.setTracks(tracksId.current);
+                },
+              ),
+            )
+          ],
+        ),
+        StreamBuilder(
+            stream: tracksId.stream$,
+            builder: (context, AsyncSnapshot<List<Tag>> snapshot) {
+              final tracks = snapshot.data;
+              if (tracks == null || tracks.isEmpty) {
+                return Container();
+              }
+              return ListView.builder(
+                  itemCount: tracks.length,
+                  shrinkWrap: true,
+                  itemBuilder: (context, index) {
+                    final Tag tag = tracks[index];
+                    return MainListTrack(tag: tag);
+                  });
+            }),
+      ],
+    );
   }
 }
 
-class TagChangePanel extends StatelessWidget {
-  const TagChangePanel({ required this.tag, Key? key }) : super(key: key);
+class TagChangePanel extends StatefulWidget {
+  const TagChangePanel({required this.tag, Key? key}) : super(key: key);
 
   final Tag tag;
 
   @override
+  State<TagChangePanel> createState() => _TagChangePanelState();
+}
+
+class _TagChangePanelState extends State<TagChangePanel> {
+  final imagePicker = GetIt.I.get<ImagePicker>();
+
+  final TextEditingController titleControler = TextEditingController();
+  final TextEditingController artistControler = TextEditingController();
+  final TextEditingController albumControler = TextEditingController();
+
+  late String titleString;
+  late String artistString;
+  late String albumString;
+  late XFile? pictureFile;
+
+  @override
+  void initState() {
+    super.initState();
+    titleString = widget.tag.title;
+    artistString = widget.tag.artist;
+    albumString = widget.tag.album;
+
+    titleControler.text = titleString;
+    artistControler.text = artistString;
+    albumControler.text = albumString;
+
+    titleControler.addListener(() {
+      titleString = titleControler.text;
+    });
+    artistControler.addListener(() {
+      artistString = artistControler.text;
+    });
+    albumControler.addListener(() {
+      albumString = albumControler.text;
+    });
+  }
+
+  pickImage() async {
+    pictureFile = await imagePicker.pickImage(source: ImageSource.gallery);
+  }
+
+  saveNewTag() {
+    final Tag tagCp = widget.tag;
+    tagCp.title = titleString;
+    tagCp.artist = artistString;
+    tagCp.album = albumString;
+    if (pictureFile != null) {
+      tagCp.setPicture(pictureFile!);
+    }
+    Tag.updateWithNewValues(widget.tag, tagCp);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Column(
-      children: const [
-        Text("Hello World")
-      ],
-      mainAxisSize: MainAxisSize.max,
+    return Material(
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: pickImage,
+            child: SizedBox(
+              height: 100.0,
+              width: 100.0,
+              child: widget.tag.getImage,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextFormField(
+              controller: titleControler,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextFormField(
+              controller: artistControler,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextFormField(
+              controller: albumControler,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+            ),
+          ),
+          SizedBox(
+            width: 300,
+            height: 60,
+            child: IconButton(
+              icon: const Icon(Icons.save),
+              onPressed: saveNewTag,
+            ),
+          )
+        ],
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+      ),
     );
   }
 }
