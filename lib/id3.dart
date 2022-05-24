@@ -175,7 +175,7 @@ class Tag {
     return encodedTag;
   }
 
-  static void updateWithNewValues(Tag oldTag, Tag newTag) async {
+  static Future<void> updateWithNewValues(Tag oldTag, Tag newTag) async {
     final String pathToChange = oldTag.mp3Path;
     final Uint8List oldTagBytes = await File(pathToChange).readAsBytes();
     final int oldTagSize = ID3.decodeTagSize(oldTagBytes.sublist(6,10)) + 10; // + 10 for the 10 bytes before actual tag data

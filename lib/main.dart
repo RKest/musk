@@ -59,7 +59,7 @@ class _MyAppState extends State<MyApp> {
         ),
         body: Column(
           children: const [
-            TrackListWidget(),
+            TrackList(),
             CurrentTackPanel(),
           ],
           mainAxisSize: MainAxisSize.max,
@@ -70,35 +70,91 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-Stream<List<Tag>> getTags() async* {
-  List<Tag> ret = [];
-  var ents = await Utils.scanDir(await Utils.getFilePath);
+class TrackList extends StatefulWidget {
+  const TrackList({Key? key}) : super(key: key);
 
-  for (FileSystemEntity ent in ents) {
-    final bool isFile = await FileSystemEntity.isFile(ent.path);
-    if (isFile && ent.path.endsWith('.mp3')) {
-      final Uint8List mp3Bytes = await File(ent.path).readAsBytes();
-      final Tag tag = Tag.fromBytes(mp3Bytes, ent.path);
-      // for (var i = 0; i < 400; i+=100){
-      //   print(mp3Bytes.sublist(i, i + 100));
-      // }
-      // var k = tag.encode();
-      // for (var i = 0; i < 400; i+=100){
-      //   print(k.sublist(i, i + 100));
-      // }
-      ret.add(tag);
-      yield ret;
-    }
+  @override
+  State<TrackList> createState() => _TrackListState();
+}
+
+class _TrackListState extends State<TrackList> {
+  final tracksId = GetIt.I.get<TracksIdentity>();
+  final tagStream = getTags();
+  void loadTags() async {
+    tagStream.listen((event) => tracksId.setTracks(event));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    loadTags();
+    return Column(
+      children: [
+        Row(
+          children: [
+            SizedBox(
+              width: 50,
+              height: 50,
+              child: IconButton(
+                icon: const Icon(Icons.sort_by_alpha),
+                onPressed: () {
+                  tracksId.setTracks(tracksId.current,
+                      optionsEnum: TrackOrderOptionsEnum.alphabetical);
+                },
+              ),
+            ),
+            SizedBox(
+              width: 50,
+              height: 50,
+              child: IconButton(
+                icon: const Icon(Icons.shuffle),
+                onPressed: () {
+                  tracksId.setTracks(tracksId.current,
+                      optionsEnum: TrackOrderOptionsEnum.random);
+                },
+              ),
+            ),
+            SizedBox(
+              width: 50,
+              height: 50,
+              child: IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {
+                  tracksId.setTracks(tracksId.current);
+                },
+              ),
+            )
+          ],
+        ),
+        StreamBuilder(
+            stream: tracksId.stream$,
+            builder: (context, AsyncSnapshot<List<Tag>> snapshot) {
+              final tracks = snapshot.data;
+              if (tracks == null || tracks.isEmpty) {
+                return Container();
+              }
+              return ListView.builder(
+                  itemCount: tracks.length,
+                  shrinkWrap: true,
+                  itemBuilder: (context, index) {
+                    final Tag tag = tracks[index];
+                    return TrackWidget(tag: tag, tagInx: index);
+                  });
+            }),
+      ],
+    );
   }
 }
 
-class MainListTrack extends StatelessWidget {
-  const MainListTrack({
+class TrackWidget extends StatelessWidget {
+  TrackWidget({
     Key? key,
     required this.tag,
+    required this.tagInx
   }) : super(key: key);
 
   final Tag tag;
+  final int tagInx;
+  final tracksId = GetIt.I.get<TracksIdentity>();
 
   @override
   Widget build(BuildContext context) {
@@ -114,13 +170,17 @@ class MainListTrack extends StatelessWidget {
               width: 60.0,
               child: tag.getImage,
             ),
-            MainTrackListInfo(tag: tag),
+            TrackInfoWidget(tag: tag),
             IconButton(
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => TagChangePanel(tag: tag)),
+                        builder: (context) => TagChangePanel(tag: tag, tagInx: tagInx)),
+                  ).then((value) async {
+                      print('Ctx popped');
+                      tracksId.setTracks(tracksId.current);
+                    } 
                   );
                 },
                 icon: const Icon(Icons.more_vert)),
@@ -129,8 +189,8 @@ class MainListTrack extends StatelessWidget {
   }
 }
 
-class MainTrackListInfo extends StatelessWidget {
-  const MainTrackListInfo({
+class TrackInfoWidget extends StatelessWidget {
+  const TrackInfoWidget({
     Key? key,
     required this.tag,
   }) : super(key: key);
@@ -297,85 +357,11 @@ class CurrentTrackPanelInfo extends StatelessWidget {
   }
 }
 
-class TrackListWidget extends StatefulWidget {
-  const TrackListWidget({Key? key}) : super(key: key);
-
-  @override
-  State<TrackListWidget> createState() => _TrackListWidgetState();
-}
-
-class _TrackListWidgetState extends State<TrackListWidget> {
-  final tracksId = GetIt.I.get<TracksIdentity>();
-  final tagStream = getTags();
-  void loadTags() async {
-    tagStream.listen((event) => tracksId.setTracks(event));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    loadTags();
-    return Column(
-      children: [
-        Row(
-          children: [
-            SizedBox(
-              width: 50,
-              height: 50,
-              child: IconButton(
-                icon: const Icon(Icons.sort_by_alpha),
-                onPressed: () {
-                  tracksId.setTracks(tracksId.current,
-                      optionsEnum: TrackOrderOptionsEnum.alphabetical);
-                },
-              ),
-            ),
-            SizedBox(
-              width: 50,
-              height: 50,
-              child: IconButton(
-                icon: const Icon(Icons.shuffle),
-                onPressed: () {
-                  tracksId.setTracks(tracksId.current,
-                      optionsEnum: TrackOrderOptionsEnum.random);
-                },
-              ),
-            ),
-            SizedBox(
-              width: 50,
-              height: 50,
-              child: IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () {
-                  tracksId.setTracks(tracksId.current);
-                },
-              ),
-            )
-          ],
-        ),
-        StreamBuilder(
-            stream: tracksId.stream$,
-            builder: (context, AsyncSnapshot<List<Tag>> snapshot) {
-              final tracks = snapshot.data;
-              if (tracks == null || tracks.isEmpty) {
-                return Container();
-              }
-              return ListView.builder(
-                  itemCount: tracks.length,
-                  shrinkWrap: true,
-                  itemBuilder: (context, index) {
-                    final Tag tag = tracks[index];
-                    return MainListTrack(tag: tag);
-                  });
-            }),
-      ],
-    );
-  }
-}
-
 class TagChangePanel extends StatefulWidget {
-  const TagChangePanel({required this.tag, Key? key}) : super(key: key);
+  const TagChangePanel({required this.tag, required this.tagInx, Key? key}) : super(key: key);
 
   final Tag tag;
+  final int tagInx;
 
   @override
   State<TagChangePanel> createState() => _TagChangePanelState();
@@ -383,6 +369,7 @@ class TagChangePanel extends StatefulWidget {
 
 class _TagChangePanelState extends State<TagChangePanel> {
   final imagePicker = GetIt.I.get<ImagePicker>();
+  final tracksId = GetIt.I.get<TracksIdentity>();
 
   final TextEditingController titleControler = TextEditingController();
   final TextEditingController artistControler = TextEditingController();
@@ -419,7 +406,7 @@ class _TagChangePanelState extends State<TagChangePanel> {
     pictureFile = await imagePicker.pickImage(source: ImageSource.gallery);
   }
 
-  saveNewTag() {
+  saveNewTag() async {
     final Tag tagCp = widget.tag;
     tagCp.title = titleString;
     tagCp.artist = artistString;
@@ -427,7 +414,10 @@ class _TagChangePanelState extends State<TagChangePanel> {
     if (pictureFile != null) {
       tagCp.setPicture(pictureFile!);
     }
-    Tag.updateWithNewValues(widget.tag, tagCp);
+    Tag.updateWithNewValues(widget.tag, tagCp).then((_){
+      tracksId.current[widget.tagInx] = tagCp;
+      Navigator.pop(context);
+    });
   }
 
   @override
@@ -495,6 +485,21 @@ void deleteAll() async {
     if (isFile && ent.path.endsWith('.mp3')) {
       print("Deleted ${ent.path}");
       await File(ent.path).delete();
+    }
+  }
+}
+
+Stream<List<Tag>> getTags() async* {
+  List<Tag> ret = [];
+  var ents = await Utils.scanDir(await Utils.getFilePath);
+
+  for (FileSystemEntity ent in ents) {
+    final bool isFile = await FileSystemEntity.isFile(ent.path);
+    if (isFile && ent.path.endsWith('.mp3')) {
+      final Uint8List mp3Bytes = await File(ent.path).readAsBytes();
+      final Tag tag = Tag.fromBytes(mp3Bytes, ent.path);
+      ret.add(tag);
+      yield ret;
     }
   }
 }
