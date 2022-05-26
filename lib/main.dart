@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:get_it/get_it.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'utils.dart';
 import 'id3.dart';
@@ -91,37 +92,25 @@ class _TrackListState extends State<TrackList> {
       children: [
         Row(
           children: [
-            SizedBox(
-              width: 50,
-              height: 50,
-              child: IconButton(
-                icon: const Icon(Icons.sort_by_alpha),
-                onPressed: () {
-                  tracksId.setTracks(tracksId.current,
-                      optionsEnum: TrackOrderOptionsEnum.alphabetical);
-                },
-              ),
+            TrackListControl(
+              controlIcon: const Icon(Icons.sort_by_alpha),
+              controlsCallback: (){
+                tracksId.setTracks(tracksId.current,
+                    optionsEnum: TrackOrderOptionsEnum.alphabetical);
+              },
             ),
-            SizedBox(
-              width: 50,
-              height: 50,
-              child: IconButton(
-                icon: const Icon(Icons.shuffle),
-                onPressed: () {
+            TrackListControl(
+              controlIcon: const Icon(Icons.shuffle),
+              controlsCallback: (){
                   tracksId.setTracks(tracksId.current,
                       optionsEnum: TrackOrderOptionsEnum.random);
-                },
-              ),
+              },
             ),
-            SizedBox(
-              width: 50,
-              height: 50,
-              child: IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () {
+            TrackListControl(
+              controlIcon: const Icon(Icons.refresh),
+              controlsCallback: (){
                   tracksId.setTracks(tracksId.current);
-                },
-              ),
+              },
             )
           ],
         ),
@@ -141,6 +130,29 @@ class _TrackListState extends State<TrackList> {
                   });
             }),
       ],
+    );
+  }
+}
+
+class TrackListControl extends StatelessWidget {
+  const TrackListControl({
+    Key? key,
+    required this.controlIcon,
+    required this.controlsCallback
+  }) : super(key: key);
+
+  final Icon controlIcon;
+  final Function controlsCallback;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 50,
+      height: 50,
+      child: IconButton(
+        icon: controlIcon,
+        onPressed: controlsCallback()
+      ),
     );
   }
 }
@@ -177,11 +189,7 @@ class TrackWidget extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                         builder: (context) => TagChangePanel(tag: tag, tagInx: tagInx)),
-                  ).then((value) async {
-                      print('Ctx popped');
-                      tracksId.setTracks(tracksId.current);
-                    } 
-                  );
+                  ).then((value) async => tracksId.setTracks(tracksId.current));
                 },
                 icon: const Icon(Icons.more_vert)),
           ]),
@@ -275,9 +283,14 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  void initState() {
+    super.initState();
     audioPlayer.onAudioPositionChanged.listen(updateProgress);
     audioPlayer.onDurationChanged.listen(setTotalTrackDuration);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Expanded(
       child: Align(
         alignment: Alignment.bottomLeft,
@@ -288,7 +301,6 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
               if (tag == null || tag.mp3Path.isEmpty) {
                 return Container();
               }
-
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -378,7 +390,7 @@ class _TagChangePanelState extends State<TagChangePanel> {
   late String titleString;
   late String artistString;
   late String albumString;
-  late XFile? pictureFile;
+  XFile? pictureFile;
 
   @override
   void initState() {
@@ -483,7 +495,6 @@ void deleteAll() async {
   for (FileSystemEntity ent in ents) {
     final bool isFile = await FileSystemEntity.isFile(ent.path);
     if (isFile && ent.path.endsWith('.mp3')) {
-      print("Deleted ${ent.path}");
       await File(ent.path).delete();
     }
   }
@@ -492,7 +503,6 @@ void deleteAll() async {
 Stream<List<Tag>> getTags() async* {
   List<Tag> ret = [];
   var ents = await Utils.scanDir(await Utils.getFilePath);
-
   for (FileSystemEntity ent in ents) {
     final bool isFile = await FileSystemEntity.isFile(ent.path);
     if (isFile && ent.path.endsWith('.mp3')) {

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'multipart.dart';
 import 'utils.dart';
 
+
 class Server{
   static String listeningAddress = "";
   static HttpServer? server;
@@ -40,9 +41,11 @@ class Server{
       } else if (request.method == "POST") {
         final Uint8List data =
             Uint8List.fromList(await request.expand((el) => el).toList());
-        final int dataStartIndex = Multipart.mp3DataStartIndex(data);
+        final List<int> dataCuffofIndices = Multipart.mp3StartAndEndIncides(data);
+        final int dataStartIndex = dataCuffofIndices[0];
+        final int dataEndIndex = dataCuffofIndices[1];
         final String fileName = Multipart.getFilename(data);
-        await Utils.saveToFile(fileName, data.sublist(dataStartIndex));
+        await Utils.saveToFile(fileName, data.sublist(dataStartIndex, dataEndIndex));
         print("Done");
         request.response.close();
       }

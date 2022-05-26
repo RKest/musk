@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 class Multipart {
+  static const int _wrapperLen = 46;
+
   static const List<int> _filename = [
     102, 105, 108, 101, 110, 97, 109, 101, 61, 34 // prevent dartfmt
   ];
@@ -33,7 +35,7 @@ class Multipart {
     return ret;
   }
 
-  static int mp3DataStartIndex(Uint8List bytes) {
+  static List<int> mp3StartAndEndIncides(Uint8List bytes) {
     int currLen = 0;
     int i = 0;
     for (i = 0; i < 1000; i++) {
@@ -47,6 +49,7 @@ class Multipart {
       }
     }
 
-    return i - 2;
+    final int startInx = i - 2;
+    return [startInx, bytes.length - _wrapperLen];
   }
 }

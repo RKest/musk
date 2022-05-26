@@ -4,8 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import 'utils.dart';
-
 class Tag {
   static const Map<String, String> _assocMap = {
     "TIT2": "title",
@@ -128,27 +126,27 @@ class Tag {
     //I, D, 3, ver 3, rev 0, flags [zeroed], size [four ones for now]
     Uint8List encodedTag =
         Uint8List.fromList([0x49, 0x44, 0x33, 3, 0, 0, 1, 1, 1, 1]);
-    int tagSize = 0;
 
     _data.forEach((key, val) {
-      final EncodedString encodedFrameCode = EncodedString(_revAssocMap[key]!);
-      final EncodedString encodedFrameVal = EncodedString(val);
-      final Uint8List frameCodeBytes = encodedFrameCode.writeableBytes();
-      final Uint8List frameSizeBytes =
-          ID3.encodeFrameSize(encodedFrameVal.frameSize());
-      final Uint8List frameFlags = Uint8List.fromList([0x00, 0x00]);
-      final Uint8List frameValueEncoding = encodedFrameVal.headerBytes();
-      final Uint8List frameValueBytes = encodedFrameVal.writeableBytes();
-      tagSize += (10 + encodedFrameVal.frameSize() + frameValueEncoding.length);
+      if (val != "Unknown"){
+        final EncodedString encodedFrameCode = EncodedString(_revAssocMap[key]!);
+        final EncodedString encodedFrameVal = EncodedString(val);
+        final Uint8List frameCodeBytes = encodedFrameCode.writeableBytes();
+        final Uint8List frameSizeBytes =
+            ID3.encodeFrameSize(encodedFrameVal.frameSize());
+        final Uint8List frameFlags = Uint8List.fromList([0x00, 0x00]);
+        final Uint8List frameValueEncoding = encodedFrameVal.headerBytes();
+        final Uint8List frameValueBytes = encodedFrameVal.writeableBytes();
 
-      encodedTag = Uint8List.fromList([
-        ...encodedTag,
-        ...frameCodeBytes,
-        ...frameSizeBytes,
-        ...frameFlags,
-        ...frameValueEncoding,
-        ...frameValueBytes
-      ]);
+        encodedTag = Uint8List.fromList([
+          ...encodedTag,
+          ...frameCodeBytes,
+          ...frameSizeBytes,
+          ...frameFlags,
+          ...frameValueEncoding,
+          ...frameValueBytes
+        ]);
+      }
     });
 
     if (picture != null){
@@ -156,17 +154,17 @@ class Tag {
       final Uint8List frameCodeBytes = encodedFrameCode.writeableBytes();
       final Uint8List frameSizeBytes = ID3.encodeFrameSize(picture!.length);
       final Uint8List frameFlags = Uint8List.fromList([0x00, 0x00]);
-      tagSize += (10 + picture!.length);
       
       encodedTag = Uint8List.fromList([
         ...encodedTag,
         ...frameCodeBytes,
         ...frameSizeBytes,
         ...frameFlags,
-        ...picture!
+        ...picture!,
       ]);
     }
 
+    final int tagSize = encodedTag.length - 10;
     final Uint8List encodedTagSize = ID3.encodeTagSize(tagSize);
     for (int i = 0; i < 4; i++) {
       encodedTag[i + 6] = encodedTagSize[i];
@@ -179,17 +177,10 @@ class Tag {
     final String pathToChange = oldTag.mp3Path;
     final Uint8List oldTagBytes = await File(pathToChange).readAsBytes();
     final int oldTagSize = ID3.decodeTagSize(oldTagBytes.sublist(6,10)) + 10; // + 10 for the 10 bytes before actual tag data
-    
     final Uint8List newEncodedTag = newTag.encode();
-    final int newEncodedTagSize = newEncodedTag.length;
-
-    if (newEncodedTagSize < oldTagSize) {
-      Utils.writeAtPostion(pathToChange, newEncodedTag, 0);
-    } else {
-      final File newFile = File(pathToChange);
-      await newFile.writeAsBytes(newEncodedTag, mode: FileMode.write);
-      await newFile.writeAsBytes(oldTagBytes.sublist(oldTagSize), mode: FileMode.append);
-    }
+    final File newFile = File(pathToChange);
+    await newFile.writeAsBytes(newEncodedTag, mode: FileMode.write);
+    await newFile.writeAsBytes(oldTagBytes.sublist(oldTagSize), mode: FileMode.append);
   }
 }
 
