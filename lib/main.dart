@@ -1,10 +1,10 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:get_it/get_it.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'utils.dart';
 import 'id3.dart';
@@ -45,14 +45,14 @@ class _MyAppState extends State<MyApp> {
             primary: Colors.black87,
             secondary: Color.fromRGBO(15, 60, 180, 1),
             brightness: Brightness.dark,
-            onPrimary: Colors.white70,
-            onSecondary: Colors.white70,
+            onPrimary: Colors.amber,
+            onSecondary: Colors.lightGreen,
             error: Colors.red,
             onError: Colors.white70,
             background: Colors.black87,
-            onBackground: Colors.white70,
+            onBackground: Colors.deepPurple,
             surface: Colors.black87,
-            onSurface: Colors.white70),
+            onSurface: Colors.blueAccent),
       ),
       home: Scaffold(
         appBar: AppBar(
@@ -79,38 +79,84 @@ class TrackList extends StatefulWidget {
 }
 
 class _TrackListState extends State<TrackList> {
+  final audioPlayer = GetIt.I.get<AudioPlayer>();
   final tracksId = GetIt.I.get<TracksIdentity>();
+  final currTrackId = GetIt.I.get<TagIdentity>();
   final tagStream = getTags();
-  void loadTags() async {
+  final RepeatIconIdentity repeatIconIdentity = RepeatIconIdentity();
+
+  loadTags() async {
     tagStream.listen((event) => tracksId.setTracks(event));
+  }
+
+  setTrackLooping(Icon _){
+    switch (RepeatIconIdentity.currentRepeatValue) {
+      case RepeatEnum.disabled:
+        audioPlayer.setReleaseMode(ReleaseMode.STOP);
+        break;
+      case RepeatEnum.repeat:
+        audioPlayer.setReleaseMode(ReleaseMode.STOP);
+        break;
+      case RepeatEnum.repeatOnce:
+        audioPlayer.setReleaseMode(ReleaseMode.LOOP);
+    }
+  }
+
+  playTrack(Tag tag) {
+    if (tag.mp3Path.isNotEmpty){
+      audioPlayer.play(
+        tag.mp3Path,
+        isLocal: true,
+        stayAwake: true
+      );
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadTags();
+    audioPlayer.onPlayerCompletion.listen(playNextTrack);
+    repeatIconIdentity.stream$.listen(setTrackLooping);
+    currTrackId.stream$.listen(playTrack);
   }
 
   @override
   Widget build(BuildContext context) {
-    loadTags();
     return Column(
       children: [
         Row(
           children: [
             TrackListControl(
               controlIcon: const Icon(Icons.sort_by_alpha),
-              controlsCallback: (){
+              controlsCallback: () {
                 tracksId.setTracks(tracksId.current,
                     optionsEnum: TrackOrderOptionsEnum.alphabetical);
               },
             ),
             TrackListControl(
               controlIcon: const Icon(Icons.shuffle),
-              controlsCallback: (){
-                  tracksId.setTracks(tracksId.current,
-                      optionsEnum: TrackOrderOptionsEnum.random);
+              controlsCallback: () {
+                tracksId.setTracks(tracksId.current,
+                    optionsEnum: TrackOrderOptionsEnum.random);
               },
             ),
             TrackListControl(
               controlIcon: const Icon(Icons.refresh),
-              controlsCallback: (){
-                  tracksId.setTracks(tracksId.current);
+              controlsCallback: () {
+                tracksId.setTracks(tracksId.current);
               },
+            ),
+            StreamBuilder(
+              builder: (context, AsyncSnapshot<Icon> snapshot) {
+                if (snapshot.data == null || !snapshot.hasData) {
+                  return Container();
+                }
+                return TrackListControl(
+                    controlIcon: snapshot.data!,
+                    controlsCallback: repeatIconIdentity.incrementIcon);
+              },
+              stream: repeatIconIdentity.stream$,
             )
           ],
         ),
@@ -135,14 +181,12 @@ class _TrackListState extends State<TrackList> {
 }
 
 class TrackListControl extends StatelessWidget {
-  const TrackListControl({
-    Key? key,
-    required this.controlIcon,
-    required this.controlsCallback
-  }) : super(key: key);
+  const TrackListControl(
+      {Key? key, required this.controlIcon, required this.controlsCallback})
+      : super(key: key);
 
   final Icon controlIcon;
-  final Function controlsCallback;
+  final VoidCallback controlsCallback;
 
   @override
   Widget build(BuildContext context) {
@@ -150,28 +194,24 @@ class TrackListControl extends StatelessWidget {
       width: 50,
       height: 50,
       child: IconButton(
-        icon: controlIcon,
-        onPressed: controlsCallback()
-      ),
+          icon: controlIcon, onPressed: controlsCallback),
     );
   }
 }
 
 class TrackWidget extends StatelessWidget {
-  TrackWidget({
-    Key? key,
-    required this.tag,
-    required this.tagInx
-  }) : super(key: key);
+  TrackWidget({Key? key, required this.tag, required this.tagInx})
+      : super(key: key);
 
   final Tag tag;
   final int tagInx;
   final tracksId = GetIt.I.get<TracksIdentity>();
+  final currTrackId = GetIt.I.get<TagIdentity>();
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => playTrack(tag),
+      onTap: () => currTrackId.changeTrack(tag),
       child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,7 +228,8 @@ class TrackWidget extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => TagChangePanel(tag: tag, tagInx: tagInx)),
+                        builder: (context) =>
+                            TagChangePanel(tag: tag, tagInx: tagInx)),
                   ).then((value) async => tracksId.setTracks(tracksId.current));
                 },
                 icon: const Icon(Icons.more_vert)),
@@ -250,9 +291,8 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
   int totalTrackDuration = 1;
   bool isPaused = false;
   int currentProgress = 0;
-  playPauseIcon() {
-    return Icon(isPaused ? Icons.play_arrow : Icons.pause);
-  }
+  double _durationSliderVal = 0.0;
+  Icon playPauseIcon = const Icon(Icons.pause);
 
   setTotalTrackDuration(Duration _) {
     audioPlayer.getDuration().then((value) {
@@ -268,7 +308,22 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
   updateProgress(Duration durationChange) {
     setState(() {
       currentProgress = durationChange.inMilliseconds;
+      final double currentTrackPostion =
+          currentProgress.toDouble() / totalTrackDuration.toDouble();
+      _durationSliderVal = min(currentTrackPostion, 1.0);
     });
+  }
+
+  setPlayPauseIcon(PlayerState state) {
+    if (state == PlayerState.PLAYING || state == PlayerState.COMPLETED) {
+      setState(() {
+        playPauseIcon = const Icon(Icons.pause);
+      });
+    } else if (state == PlayerState.PAUSED || state == PlayerState.STOPPED) {
+      setState(() {
+        playPauseIcon = const Icon(Icons.play_arrow);
+      });
+    }
   }
 
   playPasue() {
@@ -287,6 +342,7 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
     super.initState();
     audioPlayer.onAudioPositionChanged.listen(updateProgress);
     audioPlayer.onDurationChanged.listen(setTotalTrackDuration);
+    audioPlayer.onPlayerStateChanged.listen(setPlayPauseIcon);
   }
 
   @override
@@ -308,20 +364,37 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
                     children: [
                       CurrentTrackPanelInfo(tag: tag),
                       IconButton(
-                          onPressed: () {},
-                          icon: const Icon(Icons.fast_rewind)),
-                      IconButton(onPressed: playPasue, icon: playPauseIcon()),
+                        onPressed: () => playPreviosTrack(),
+                        icon: const Icon(Icons.fast_rewind)
+                      ),
                       IconButton(
-                          onPressed: () {},
-                          icon: const Icon(Icons.fast_forward)),
+                        onPressed: playPasue, 
+                        icon: playPauseIcon
+                      ),
+                      IconButton(
+                        onPressed: () => playNextTrack(null, manualTrackSkip: true),
+                        icon: const Icon(Icons.fast_forward)
+                      ),
                     ],
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 16.0),
                     child: Slider(
-                        value: currentProgress.toDouble() /
-                            totalTrackDuration.toDouble(),
-                        onChanged: (change) {}),
+                      value: _durationSliderVal,
+                      onChanged: (value) {
+                        setState(() {
+                          _durationSliderVal = value;
+                        });
+                      },
+                      onChangeStart: (_) {
+                        audioPlayer.pause();
+                      },
+                      onChangeEnd: (val) {
+                        audioPlayer.seek(Duration(
+                            milliseconds: (val * totalTrackDuration).toInt()));
+                        audioPlayer.resume();
+                      },
+                    ),
                   )
                 ],
               );
@@ -370,7 +443,8 @@ class CurrentTrackPanelInfo extends StatelessWidget {
 }
 
 class TagChangePanel extends StatefulWidget {
-  const TagChangePanel({required this.tag, required this.tagInx, Key? key}) : super(key: key);
+  const TagChangePanel({required this.tag, required this.tagInx, Key? key})
+      : super(key: key);
 
   final Tag tag;
   final int tagInx;
@@ -426,7 +500,7 @@ class _TagChangePanelState extends State<TagChangePanel> {
     if (pictureFile != null) {
       tagCp.setPicture(pictureFile!);
     }
-    Tag.updateWithNewValues(widget.tag, tagCp).then((_){
+    Tag.updateWithNewValues(widget.tag, tagCp).then((_) {
       tracksId.current[widget.tagInx] = tagCp;
       Navigator.pop(context);
     });
@@ -483,13 +557,6 @@ class _TagChangePanelState extends State<TagChangePanel> {
   }
 }
 
-void playTrack(Tag tag) {
-  final audioPlayer = GetIt.I.get<AudioPlayer>();
-  final tagId = GetIt.I.get<TagIdentity>();
-  tagId.changeTrack(tag);
-  audioPlayer.play(tag.mp3Path);
-}
-
 void deleteAll() async {
   List<FileSystemEntity> ents = await Utils.scanDir(await Utils.getFilePath);
   for (FileSystemEntity ent in ents) {
@@ -511,5 +578,35 @@ Stream<List<Tag>> getTags() async* {
       ret.add(tag);
       yield ret;
     }
+  }
+}
+
+void playNextTrack(void _, {bool manualTrackSkip = false}) {
+  final tracksId = GetIt.I.get<TracksIdentity>();
+  final currentTrackId = GetIt.I.get<TagIdentity>();
+  final audioPlayer = GetIt.I.get<AudioPlayer>();
+  if (RepeatIconIdentity.currentRepeatValue != RepeatEnum.repeatOnce || manualTrackSkip){
+    final int currentTrackIndex = tracksId.current.indexWhere(
+      (element) => element.mp3Path == currentTrackId.current.mp3Path);
+    if(currentTrackIndex == tracksId.current.length - 1){
+      if (RepeatIconIdentity.currentRepeatValue == RepeatEnum.disabled){
+        audioPlayer.release();
+      } else {
+        currentTrackId.changeTrack(tracksId.current[0]);
+      }
+    } else {
+      currentTrackId.changeTrack(tracksId.current[currentTrackIndex + 1]);
+    }
+  }
+}
+
+void playPreviosTrack() {
+  final tracksId = GetIt.I.get<TracksIdentity>();
+  final currentTrackId = GetIt.I.get<TagIdentity>();
+  final audioPlayer = GetIt.I.get<AudioPlayer>();
+  final int currentTrackIndex = tracksId.current.indexWhere(
+    (element) => element.mp3Path == currentTrackId.current.mp3Path);
+  if (currentTrackIndex != 0){
+    currentTrackId.changeTrack(tracksId.current[currentTrackIndex - 1]);
   }
 }
