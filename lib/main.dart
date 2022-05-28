@@ -59,11 +59,15 @@ class _MyAppState extends State<MyApp> {
           title: const Text("Hello world!"),
         ),
         body: Column(
-          children: const [
-            TrackList(),
-            CurrentTackPanel(),
+          children: [
+            TrackListControls(),
+            const Expanded(
+              flex: 1,
+              child: SingleChildScrollView(
+                  physics: ScrollPhysics(), child: TrackList()),
+            ),
+            const CurrentTackPanel()
           ],
-          mainAxisSize: MainAxisSize.max,
         ),
         floatingActionButton: const FloatingActionButton(onPressed: deleteAll),
       ),
@@ -71,110 +75,47 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-class TrackList extends StatefulWidget {
-  const TrackList({Key? key}) : super(key: key);
+class TrackListControls extends StatelessWidget {
+  TrackListControls({Key? key}) : super(key: key);
 
-  @override
-  State<TrackList> createState() => _TrackListState();
-}
-
-class _TrackListState extends State<TrackList> {
-  final audioPlayer = GetIt.I.get<AudioPlayer>();
   final tracksId = GetIt.I.get<TracksIdentity>();
-  final currTrackId = GetIt.I.get<TagIdentity>();
-  final tagStream = getTags();
-  final RepeatIconIdentity repeatIconIdentity = RepeatIconIdentity();
-
-  loadTags() async {
-    tagStream.listen((event) => tracksId.setTracks(event));
-  }
-
-  setTrackLooping(Icon _){
-    switch (RepeatIconIdentity.currentRepeatValue) {
-      case RepeatEnum.disabled:
-        audioPlayer.setReleaseMode(ReleaseMode.STOP);
-        break;
-      case RepeatEnum.repeat:
-        audioPlayer.setReleaseMode(ReleaseMode.STOP);
-        break;
-      case RepeatEnum.repeatOnce:
-        audioPlayer.setReleaseMode(ReleaseMode.LOOP);
-    }
-  }
-
-  playTrack(Tag tag) {
-    if (tag.mp3Path.isNotEmpty){
-      audioPlayer.play(
-        tag.mp3Path,
-        isLocal: true,
-        stayAwake: true
-      );
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    loadTags();
-    audioPlayer.onPlayerCompletion.listen(playNextTrack);
-    repeatIconIdentity.stream$.listen(setTrackLooping);
-    currTrackId.stream$.listen(playTrack);
-  }
+  final repeatIconIdentity = RepeatIconIdentity();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
       children: [
-        Row(
-          children: [
-            TrackListControl(
-              controlIcon: const Icon(Icons.sort_by_alpha),
-              controlsCallback: () {
-                tracksId.setTracks(tracksId.current,
-                    optionsEnum: TrackOrderOptionsEnum.alphabetical);
-              },
-            ),
-            TrackListControl(
-              controlIcon: const Icon(Icons.shuffle),
-              controlsCallback: () {
-                tracksId.setTracks(tracksId.current,
-                    optionsEnum: TrackOrderOptionsEnum.random);
-              },
-            ),
-            TrackListControl(
-              controlIcon: const Icon(Icons.refresh),
-              controlsCallback: () {
-                tracksId.setTracks(tracksId.current);
-              },
-            ),
-            StreamBuilder(
-              builder: (context, AsyncSnapshot<Icon> snapshot) {
-                if (snapshot.data == null || !snapshot.hasData) {
-                  return Container();
-                }
-                return TrackListControl(
-                    controlIcon: snapshot.data!,
-                    controlsCallback: repeatIconIdentity.incrementIcon);
-              },
-              stream: repeatIconIdentity.stream$,
-            )
-          ],
+        TrackListControl(
+          controlIcon: const Icon(Icons.sort_by_alpha),
+          controlsCallback: () {
+            tracksId.setTracks(tracksId.current,
+                optionsEnum: TrackOrderOptionsEnum.alphabetical);
+          },
+        ),
+        TrackListControl(
+          controlIcon: const Icon(Icons.shuffle),
+          controlsCallback: () {
+            tracksId.setTracks(tracksId.current,
+                optionsEnum: TrackOrderOptionsEnum.random);
+          },
+        ),
+        TrackListControl(
+          controlIcon: const Icon(Icons.refresh),
+          controlsCallback: () {
+            tracksId.setTracks(tracksId.current);
+          },
         ),
         StreamBuilder(
-            stream: tracksId.stream$,
-            builder: (context, AsyncSnapshot<List<Tag>> snapshot) {
-              final tracks = snapshot.data;
-              if (tracks == null || tracks.isEmpty) {
-                return Container();
-              }
-              return ListView.builder(
-                  itemCount: tracks.length,
-                  shrinkWrap: true,
-                  itemBuilder: (context, index) {
-                    final Tag tag = tracks[index];
-                    return TrackWidget(tag: tag, tagInx: index);
-                  });
-            }),
+          builder: (context, AsyncSnapshot<Icon> snapshot) {
+            if (snapshot.data == null || !snapshot.hasData) {
+              return Container();
+            }
+            return TrackListControl(
+                controlIcon: snapshot.data!,
+                controlsCallback: repeatIconIdentity.incrementIcon);
+          },
+          stream: repeatIconIdentity.stream$,
+        )
       ],
     );
   }
@@ -193,8 +134,75 @@ class TrackListControl extends StatelessWidget {
     return SizedBox(
       width: 50,
       height: 50,
-      child: IconButton(
-          icon: controlIcon, onPressed: controlsCallback),
+      child: IconButton(icon: controlIcon, onPressed: controlsCallback),
+    );
+  }
+}
+
+class TrackList extends StatefulWidget {
+  const TrackList({Key? key}) : super(key: key);
+
+  @override
+  State<TrackList> createState() => _TrackListState();
+}
+
+class _TrackListState extends State<TrackList> {
+  final audioPlayer = GetIt.I.get<AudioPlayer>();
+  final tracksId = GetIt.I.get<TracksIdentity>();
+  final currTrackId = GetIt.I.get<TagIdentity>();
+  final RepeatIconIdentity repeatIconIdentity = RepeatIconIdentity();
+
+  setTrackLooping(Icon _) {
+    switch (RepeatIconIdentity.currentRepeatValue) {
+      case RepeatEnum.disabled:
+        audioPlayer.setReleaseMode(ReleaseMode.STOP);
+        break;
+      case RepeatEnum.repeat:
+        audioPlayer.setReleaseMode(ReleaseMode.STOP);
+        break;
+      case RepeatEnum.repeatOnce:
+        audioPlayer.setReleaseMode(ReleaseMode.LOOP);
+    }
+  }
+
+  playTrack(Tag tag) {
+    if (tag.mp3Path.isNotEmpty) {
+      audioPlayer.play(tag.mp3Path, isLocal: true, stayAwake: true);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    getTags().listen(tracksId.setTracks);
+    audioPlayer.onPlayerCompletion.listen(playNextTrack);
+    repeatIconIdentity.stream$.listen(setTrackLooping);
+    currTrackId.stream$.listen(playTrack);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        StreamBuilder(
+            stream: tracksId.stream$,
+            builder: (context, AsyncSnapshot<List<Tag>> snapshot) {
+              final tracks = snapshot.data;
+              if (tracks == null || tracks.isEmpty) {
+                return Container();
+              }
+              return ListView.builder(
+                itemCount: tracks.length,
+                shrinkWrap: true,
+                scrollDirection: Axis.vertical,
+                physics: const NeverScrollableScrollPhysics(),
+                itemBuilder: (context, index) {
+                  final Tag tag = tracks[index];
+                  return TrackWidget(tag: tag, tagInx: index);
+                },
+              );
+            }),
+      ],
     );
   }
 }
@@ -218,8 +226,8 @@ class TrackWidget extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              height: 60.0,
-              width: 60.0,
+              height: 65.0,
+              width: 65.0,
               child: tag.getImage,
             ),
             TrackInfoWidget(tag: tag),
@@ -347,60 +355,51 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Align(
-        alignment: Alignment.bottomLeft,
-        child: StreamBuilder(
-            stream: tagId.stream$,
-            builder: (context, AsyncSnapshot<Tag> snapshot) {
-              final tag = snapshot.data;
-              if (tag == null || tag.mp3Path.isEmpty) {
-                return Container();
-              }
-              return Column(
-                mainAxisSize: MainAxisSize.min,
+    return StreamBuilder(
+        stream: tagId.stream$,
+        builder: (context, AsyncSnapshot<Tag> snapshot) {
+          final tag = snapshot.data;
+          if (tag == null || tag.mp3Path.isEmpty) {
+            return Container();
+          }
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      CurrentTrackPanelInfo(tag: tag),
-                      IconButton(
-                        onPressed: () => playPreviosTrack(),
-                        icon: const Icon(Icons.fast_rewind)
-                      ),
-                      IconButton(
-                        onPressed: playPasue, 
-                        icon: playPauseIcon
-                      ),
-                      IconButton(
-                        onPressed: () => playNextTrack(null, manualTrackSkip: true),
-                        icon: const Icon(Icons.fast_forward)
-                      ),
-                    ],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 16.0),
-                    child: Slider(
-                      value: _durationSliderVal,
-                      onChanged: (value) {
-                        setState(() {
-                          _durationSliderVal = value;
-                        });
-                      },
-                      onChangeStart: (_) {
-                        audioPlayer.pause();
-                      },
-                      onChangeEnd: (val) {
-                        audioPlayer.seek(Duration(
-                            milliseconds: (val * totalTrackDuration).toInt()));
-                        audioPlayer.resume();
-                      },
-                    ),
-                  )
+                  CurrentTrackPanelInfo(tag: tag),
+                  IconButton(
+                      onPressed: () => playPreviosTrack(),
+                      icon: const Icon(Icons.fast_rewind)),
+                  IconButton(onPressed: playPasue, icon: playPauseIcon),
+                  IconButton(
+                      onPressed: () =>
+                          playNextTrack(null, manualTrackSkip: true),
+                      icon: const Icon(Icons.fast_forward)),
                 ],
-              );
-            }),
-      ),
-    );
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 16.0),
+                child: Slider(
+                  value: _durationSliderVal,
+                  onChanged: (value) {
+                    setState(() {
+                      _durationSliderVal = value;
+                    });
+                  },
+                  onChangeStart: (_) {
+                    audioPlayer.pause();
+                  },
+                  onChangeEnd: (val) {
+                    audioPlayer.seek(Duration(
+                        milliseconds: (val * totalTrackDuration).toInt()));
+                    audioPlayer.resume();
+                  },
+                ),
+              )
+            ],
+          );
+        });
   }
 }
 
@@ -585,11 +584,12 @@ void playNextTrack(void _, {bool manualTrackSkip = false}) {
   final tracksId = GetIt.I.get<TracksIdentity>();
   final currentTrackId = GetIt.I.get<TagIdentity>();
   final audioPlayer = GetIt.I.get<AudioPlayer>();
-  if (RepeatIconIdentity.currentRepeatValue != RepeatEnum.repeatOnce || manualTrackSkip){
+  if (RepeatIconIdentity.currentRepeatValue != RepeatEnum.repeatOnce ||
+      manualTrackSkip) {
     final int currentTrackIndex = tracksId.current.indexWhere(
-      (element) => element.mp3Path == currentTrackId.current.mp3Path);
-    if(currentTrackIndex == tracksId.current.length - 1){
-      if (RepeatIconIdentity.currentRepeatValue == RepeatEnum.disabled){
+        (element) => element.mp3Path == currentTrackId.current.mp3Path);
+    if (currentTrackIndex == tracksId.current.length - 1) {
+      if (RepeatIconIdentity.currentRepeatValue == RepeatEnum.disabled) {
         audioPlayer.release();
       } else {
         currentTrackId.changeTrack(tracksId.current[0]);
@@ -603,10 +603,9 @@ void playNextTrack(void _, {bool manualTrackSkip = false}) {
 void playPreviosTrack() {
   final tracksId = GetIt.I.get<TracksIdentity>();
   final currentTrackId = GetIt.I.get<TagIdentity>();
-  final audioPlayer = GetIt.I.get<AudioPlayer>();
   final int currentTrackIndex = tracksId.current.indexWhere(
-    (element) => element.mp3Path == currentTrackId.current.mp3Path);
-  if (currentTrackIndex != 0){
+      (element) => element.mp3Path == currentTrackId.current.mp3Path);
+  if (currentTrackIndex != 0) {
     currentTrackId.changeTrack(tracksId.current[currentTrackIndex - 1]);
   }
 }

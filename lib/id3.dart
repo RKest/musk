@@ -245,12 +245,12 @@ class EncodedString {
       //LittleEndian
       if (bytes[1] == 0xff && bytes[2] == 0xfe) {
         for (int i = 0; i < u16Bytes.length; i++) {
-          u16Bytes[i] = (bytes[2 * i + 4] << 8) + bytes[2 * i + 3];
+          u16Bytes[i] = (bytes[2 * i + 2] << 8) + bytes[2 * i + 1];
         }
         //BigEndian
       } else if (bytes[1] == 0xfe && bytes[2] == 0xff) {
         for (int i = 0; i < u16Bytes.length; i++) {
-          u16Bytes[i] = (bytes[2 * i + 3] << 8) + bytes[2 * i + 4];
+          u16Bytes[i] = (bytes[2 * i + 1] << 8) + bytes[2 * i + 2];
         }
       } else {
         throw "Wrongly encoded utf16 string";
