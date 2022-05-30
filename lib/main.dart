@@ -11,11 +11,14 @@ import 'id3.dart';
 import 'state.dart';
 import 'server.dart';
 
+const double gTrackDimentions = 65.0;
+
 void main() {
   GetIt.I.registerSingleton<TagIdentity>(TagIdentity());
   GetIt.I.registerSingleton<AudioPlayer>(AudioPlayer());
   GetIt.I.registerSingleton<TracksIdentity>(TracksIdentity());
   GetIt.I.registerSingleton<ImagePicker>(ImagePicker());
+  GetIt.I.registerSingleton<ScrollController>(ScrollController());
   runApp(const MyApp());
 }
 
@@ -36,6 +39,8 @@ class _MyAppState extends State<MyApp> {
     Server.listen();
   }
 
+  final scrollingController = GetIt.I.get<ScrollController>();
+
   @override
   Widget build(BuildContext mainContext) {
     startServer();
@@ -49,7 +54,7 @@ class _MyAppState extends State<MyApp> {
             onSecondary: Colors.lightGreen,
             error: Colors.red,
             onError: Colors.white70,
-            background: Colors.black87,
+            background: Colors.black54,
             onBackground: Colors.deepPurple,
             surface: Colors.black87,
             onSurface: Colors.blueAccent),
@@ -61,10 +66,13 @@ class _MyAppState extends State<MyApp> {
         body: Column(
           children: [
             TrackListControls(),
-            const Expanded(
+            Expanded(
               flex: 1,
               child: SingleChildScrollView(
-                  physics: ScrollPhysics(), child: TrackList()),
+                physics: const ScrollPhysics(),
+                child: const TrackList(),
+                controller: scrollingController,
+              ),
             ),
             const CurrentTackPanel()
           ],
@@ -79,7 +87,19 @@ class TrackListControls extends StatelessWidget {
   TrackListControls({Key? key}) : super(key: key);
 
   final tracksId = GetIt.I.get<TracksIdentity>();
+  final scrollController = GetIt.I.get<ScrollController>();
   final repeatIconIdentity = RepeatIconIdentity();
+
+  scrollToCurrentTrack() {
+    final currTrackIndex = currentTrackIndex();
+    if (currTrackIndex != null) {
+      scrollController.animateTo(
+        currTrackIndex * gTrackDimentions,
+        duration: const Duration(microseconds: 1),
+        curve: Curves.linear,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,22 +108,20 @@ class TrackListControls extends StatelessWidget {
         TrackListControl(
           controlIcon: const Icon(Icons.sort_by_alpha),
           controlsCallback: () {
-            tracksId.setTracks(tracksId.current,
-                optionsEnum: TrackOrderOptionsEnum.alphabetical);
+            tracksId.sortTrackAlphabetically();
+            scrollToCurrentTrack();
           },
         ),
         TrackListControl(
           controlIcon: const Icon(Icons.shuffle),
           controlsCallback: () {
-            tracksId.setTracks(tracksId.current,
-                optionsEnum: TrackOrderOptionsEnum.random);
+            final int? currTrackIndex = currentTrackIndex();
+            tracksId.shuffleTracks(currTrackIndex);
           },
         ),
         TrackListControl(
           controlIcon: const Icon(Icons.refresh),
-          controlsCallback: () {
-            tracksId.setTracks(tracksId.current);
-          },
+          controlsCallback: tracksId.refreshTracks,
         ),
         StreamBuilder(
           builder: (context, AsyncSnapshot<Icon> snapshot) {
@@ -134,7 +152,10 @@ class TrackListControl extends StatelessWidget {
     return SizedBox(
       width: 50,
       height: 50,
-      child: IconButton(icon: controlIcon, onPressed: controlsCallback),
+      child: IconButton(
+        icon: controlIcon,
+        onPressed: controlsCallback,
+      ),
     );
   }
 }
@@ -182,105 +203,120 @@ class _TrackListState extends State<TrackList> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return StreamBuilder(
+      stream: tracksId.stream$,
+      builder: (context, AsyncSnapshot<List<Tag>> snapshot) {
+        final tracks = snapshot.data;
+        if (tracks == null || tracks.isEmpty) {
+          return Container();
+        }
+        return ReorderableListView.builder(
+          shrinkWrap: true,
+          scrollDirection: Axis.vertical,
+          physics: const NeverScrollableScrollPhysics(),
+          onReorder: tracksId.swapTracks,
+          itemCount: tracks.length,
+          itemBuilder: (context, index) {
+            final Tag tag = tracks[index];
+            return ListTile(
+              onTap: () => currTrackId.changeTrack(tracksId.current[index]),
+              key: Key(tag.mp3Path),
+              visualDensity: const VisualDensity(vertical: -4),
+              minVerticalPadding: 0.0,
+              contentPadding: const EdgeInsets.all(0.0),
+              title: TrackInformations(tag),
+              trailing: TrackOptions(tag, index),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class TrackInformations extends StatefulWidget {
+  const TrackInformations(this.tag, {Key? key}) : super(key: key);
+  final Tag tag;
+
+  @override
+  State<TrackInformations> createState() => _TrackInformationsState();
+}
+
+class _TrackInformationsState extends State<TrackInformations> {
+  late Image trackImage;
+
+  @override
+  void initState() {
+    super.initState();
+    trackImage = widget.tag.getImage;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
       children: [
-        StreamBuilder(
-            stream: tracksId.stream$,
-            builder: (context, AsyncSnapshot<List<Tag>> snapshot) {
-              final tracks = snapshot.data;
-              if (tracks == null || tracks.isEmpty) {
-                return Container();
-              }
-              return ListView.builder(
-                itemCount: tracks.length,
-                shrinkWrap: true,
-                scrollDirection: Axis.vertical,
-                physics: const NeverScrollableScrollPhysics(),
-                itemBuilder: (context, index) {
-                  final Tag tag = tracks[index];
-                  return TrackWidget(tag: tag, tagInx: index);
-                },
-              );
-            }),
+        SizedBox(
+          width: gTrackDimentions,
+          height: gTrackDimentions,
+          child: trackImage,
+        ),
+        Expanded(
+          flex: 1,
+          child: Column(
+            mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8.0, 16.0, 0.0, 0.0),
+                child: Text(
+                  widget.tag.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8.0, 0.0, 0.0, 0.0),
+                child: Text(widget.tag.artist),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 }
 
-class TrackWidget extends StatelessWidget {
-  TrackWidget({Key? key, required this.tag, required this.tagInx})
-      : super(key: key);
-
+class TrackOptions extends StatelessWidget {
+  TrackOptions(this.tag, this.index, {Key? key}) : super(key: key);
+  final int index;
   final Tag tag;
-  final int tagInx;
   final tracksId = GetIt.I.get<TracksIdentity>();
-  final currTrackId = GetIt.I.get<TagIdentity>();
-
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => currTrackId.changeTrack(tag),
-      child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: 65.0,
-              width: 65.0,
-              child: tag.getImage,
-            ),
-            TrackInfoWidget(tag: tag),
-            IconButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) =>
-                            TagChangePanel(tag: tag, tagInx: tagInx)),
-                  ).then((value) async => tracksId.setTracks(tracksId.current));
-                },
-                icon: const Icon(Icons.more_vert)),
-          ]),
-    );
-  }
-}
-
-class TrackInfoWidget extends StatelessWidget {
-  const TrackInfoWidget({
-    Key? key,
-    required this.tag,
-  }) : super(key: key);
-
-  final Tag tag;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      flex: 1,
-      child: Column(
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8.0, 16.0, 0.0, 0.0),
-            child: Text(
-              tag.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8.0, 0.0, 0.0, 0.0),
-            child: Text(tag.artist),
-          )
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.more_vert),
+          onPressed: () {
+            changePage(
+              context: context,
+              page: TagChangePanel(tag, index),
+              cb: () async => tracksId.refreshTracks(),
+            );
+          },
+        ),
+        ReorderableDragStartListener(
+          child: const Icon(Icons.drag_handle),
+          index: index,
+        ),
+      ],
     );
   }
 }
@@ -297,10 +333,10 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
   final audioPlayer = GetIt.I.get<AudioPlayer>();
 
   int totalTrackDuration = 1;
-  bool isPaused = false;
   int currentProgress = 0;
   double _durationSliderVal = 0.0;
   Icon playPauseIcon = const Icon(Icons.pause);
+  PlayerState currPlayerState = PlayerState.PAUSED;
 
   setTotalTrackDuration(Duration _) {
     audioPlayer.getDuration().then((value) {
@@ -323,11 +359,12 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
   }
 
   setPlayPauseIcon(PlayerState state) {
-    if (state == PlayerState.PLAYING || state == PlayerState.COMPLETED) {
+    currPlayerState = state;
+    if (state == PlayerState.PLAYING) {
       setState(() {
         playPauseIcon = const Icon(Icons.pause);
       });
-    } else if (state == PlayerState.PAUSED || state == PlayerState.STOPPED) {
+    } else {
       setState(() {
         playPauseIcon = const Icon(Icons.play_arrow);
       });
@@ -335,14 +372,11 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
   }
 
   playPasue() {
-    if (isPaused) {
-      audioPlayer.resume();
-    } else {
+    if (currPlayerState == PlayerState.PLAYING) {
       audioPlayer.pause();
+    } else {
+      audioPlayer.resume();
     }
-    setState(() {
-      isPaused = !isPaused;
-    });
   }
 
   @override
@@ -356,50 +390,55 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
-        stream: tagId.stream$,
-        builder: (context, AsyncSnapshot<Tag> snapshot) {
-          final tag = snapshot.data;
-          if (tag == null || tag.mp3Path.isEmpty) {
-            return Container();
-          }
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  CurrentTrackPanelInfo(tag: tag),
-                  IconButton(
-                      onPressed: () => playPreviosTrack(),
-                      icon: const Icon(Icons.fast_rewind)),
-                  IconButton(onPressed: playPasue, icon: playPauseIcon),
-                  IconButton(
-                      onPressed: () =>
-                          playNextTrack(null, manualTrackSkip: true),
-                      icon: const Icon(Icons.fast_forward)),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 16.0),
-                child: Slider(
-                  value: _durationSliderVal,
-                  onChanged: (value) {
-                    setState(() {
-                      _durationSliderVal = value;
-                    });
-                  },
-                  onChangeStart: (_) {
-                    audioPlayer.pause();
-                  },
-                  onChangeEnd: (val) {
-                    audioPlayer.seek(Duration(
-                        milliseconds: (val * totalTrackDuration).toInt()));
-                    audioPlayer.resume();
-                  },
+      stream: tagId.stream$,
+      builder: (context, AsyncSnapshot<Tag> snapshot) {
+        final tag = snapshot.data;
+        if (tag == null || tag.mp3Path.isEmpty) {
+          return Container();
+        }
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                CurrentTrackPanelInfo(tag: tag),
+                IconButton(
+                  onPressed: () => playPreviosTrack(),
+                  icon: const Icon(Icons.fast_rewind),
                 ),
-              )
-            ],
-          );
-        });
+                IconButton(
+                  onPressed: playPasue,
+                  icon: playPauseIcon,
+                ),
+                IconButton(
+                  onPressed: () => playNextTrack(null, manualTrackSkip: true),
+                  icon: const Icon(Icons.fast_forward),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 16.0),
+              child: Slider(
+                value: _durationSliderVal,
+                onChanged: (value) {
+                  setState(() {
+                    _durationSliderVal = value;
+                  });
+                },
+                onChangeStart: (_) {
+                  audioPlayer.pause();
+                },
+                onChangeEnd: (val) {
+                  audioPlayer.seek(Duration(
+                      milliseconds: (val * totalTrackDuration).toInt()));
+                  audioPlayer.resume();
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -442,8 +481,7 @@ class CurrentTrackPanelInfo extends StatelessWidget {
 }
 
 class TagChangePanel extends StatefulWidget {
-  const TagChangePanel({required this.tag, required this.tagInx, Key? key})
-      : super(key: key);
+  const TagChangePanel(this.tag, this.tagInx, {Key? key}) : super(key: key);
 
   final Tag tag;
   final int tagInx;
@@ -580,22 +618,33 @@ Stream<List<Tag>> getTags() async* {
   }
 }
 
+int? currentTrackIndex() {
+  final tracksId = GetIt.I.get<TracksIdentity>();
+  final currentTrackId = GetIt.I.get<TagIdentity>();
+  if (currentTrackId.current.mp3Path.isEmpty) {
+    return null;
+  }
+  final int currentTrackIndex = tracksId.current.indexWhere(
+      (element) => element.mp3Path == currentTrackId.current.mp3Path);
+  return currentTrackIndex;
+}
+
 void playNextTrack(void _, {bool manualTrackSkip = false}) {
   final tracksId = GetIt.I.get<TracksIdentity>();
   final currentTrackId = GetIt.I.get<TagIdentity>();
   final audioPlayer = GetIt.I.get<AudioPlayer>();
-  if (RepeatIconIdentity.currentRepeatValue != RepeatEnum.repeatOnce ||
-      manualTrackSkip) {
-    final int currentTrackIndex = tracksId.current.indexWhere(
-        (element) => element.mp3Path == currentTrackId.current.mp3Path);
-    if (currentTrackIndex == tracksId.current.length - 1) {
+  final int? currTrackIndex = currentTrackIndex();
+  if ((RepeatIconIdentity.currentRepeatValue != RepeatEnum.repeatOnce ||
+          manualTrackSkip) &&
+      currTrackIndex != null) {
+    if (currTrackIndex == tracksId.current.length - 1) {
       if (RepeatIconIdentity.currentRepeatValue == RepeatEnum.disabled) {
         audioPlayer.release();
       } else {
         currentTrackId.changeTrack(tracksId.current[0]);
       }
     } else {
-      currentTrackId.changeTrack(tracksId.current[currentTrackIndex + 1]);
+      currentTrackId.changeTrack(tracksId.current[currTrackIndex + 1]);
     }
   }
 }
@@ -603,9 +652,18 @@ void playNextTrack(void _, {bool manualTrackSkip = false}) {
 void playPreviosTrack() {
   final tracksId = GetIt.I.get<TracksIdentity>();
   final currentTrackId = GetIt.I.get<TagIdentity>();
-  final int currentTrackIndex = tracksId.current.indexWhere(
-      (element) => element.mp3Path == currentTrackId.current.mp3Path);
-  if (currentTrackIndex != 0) {
-    currentTrackId.changeTrack(tracksId.current[currentTrackIndex - 1]);
+  final int? currTrackIndex = currentTrackIndex();
+  if (currTrackIndex != null && currTrackIndex != 0) {
+    currentTrackId.changeTrack(tracksId.current[currTrackIndex - 1]);
   }
+}
+
+void changePage(
+    {required BuildContext context,
+    required Widget page,
+    required VoidCallback cb}) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => page),
+  ).then((_) => cb());
 }
