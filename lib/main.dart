@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/widgets.dart';
 import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
 import 'utils.dart';
@@ -103,48 +104,44 @@ class TrackListControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Stack(
       children: [
-        TrackListControl(
-          controlIcon: const Icon(Icons.sort_by_alpha),
-          controlsCallback: () {
-            tracksId.sortTrackAlphabetically();
-            scrollToCurrentTrack();
-          },
-        ),
-        TrackListControl(
-          controlIcon: const Icon(Icons.shuffle),
-          controlsCallback: () {
-            final int? currTrackIndex = currentTrackIndex();
-            tracksId.shuffleTracks(currTrackIndex);
-          },
-        ),
-        TrackListControl(
-          controlIcon: const Icon(Icons.refresh),
-          controlsCallback: tracksId.refreshTracks,
-        ),
-        StreamBuilder(
-          builder: (context, AsyncSnapshot<Icon> snapshot) {
-            if (snapshot.data == null || !snapshot.hasData) {
-              return Container();
-            }
-            return TrackListControl(
-              controlIcon: snapshot.data!,
-              controlsCallback: repeatIconIdentity.incrementIcon,
-            );
-          },
-          stream: repeatIconIdentity.stream$,
-        ),
-        Expanded(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 50.0),
-            alignment: Alignment.centerRight,
-            child: TrackListControl(
-              controlIcon: const Icon(Icons.search), 
-              controlsCallback: (){},
+        Row(
+          children: [
+            TrackListControl(
+              controlIcon: const Icon(Icons.sort_by_alpha),
+              controlsCallback: () {
+                tracksId.sortTrackAlphabetically();
+                scrollToCurrentTrack();
+              },
             ),
-          ),
+            TrackListControl(
+              controlIcon: const Icon(Icons.shuffle),
+              controlsCallback: () {
+                final int? currTrackIndex = currentTrackIndex();
+                tracksId.shuffleTracks(currTrackIndex);
+              },
+            ),
+            TrackListControl(
+              controlIcon: const Icon(Icons.refresh),
+              controlsCallback: tracksId.refreshTracks,
+            ),
+            StreamBuilder(
+              builder: (context, AsyncSnapshot<Icon> snapshot) {
+                if (snapshot.data == null || !snapshot.hasData) {
+                  return Container();
+                }
+                return TrackListControl(
+                  controlIcon: snapshot.data!,
+                  controlsCallback: repeatIconIdentity.incrementIcon,
+                );
+              },
+              stream: repeatIconIdentity.stream$,
+            ),
+          ],
         ),
+        const Align(
+            alignment: Alignment.centerLeft, child: TrackListSearchBar())
       ],
     );
   }
@@ -605,6 +602,93 @@ class _TagChangePanelState extends State<TagChangePanel> {
   }
 }
 
+class TrackListSearchBar extends StatefulWidget with PreferredSizeWidget {
+  const TrackListSearchBar({Key? key}) : super(key: key);
+
+  @override
+  State<TrackListSearchBar> createState() => TrackListSearchBarState();
+
+  @override
+  Size get preferredSize => const Size.fromHeight(50.0);
+}
+
+class TrackListSearchBarState extends State<TrackListSearchBar> {
+  bool isOpen = false;
+  final animationDuration = const Duration(milliseconds: 100);
+  final GlobalKey _formKey = GlobalKey();
+  late FocusNode textFieldFocusNode;
+  toggleIsOpen() async {
+    setState(() => isOpen = !isOpen);
+    await Future.delayed(animationDuration);
+    if(isOpen){
+      textFieldFocusNode.requestFocus();
+    } else {
+      textFieldFocusNode.unfocus();
+    }
+  }
+  setCurrSearchValue(String s) => currSearchValue = s;
+  String currSearchValue = "";
+
+  @override
+  void initState() {
+    super.initState();
+    textFieldFocusNode = FocusNode();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final searchBarWidth = MediaQuery.of(context).size.width;
+    return Stack(
+      alignment: Alignment.centerLeft,
+      children: [
+        AnimatedContainer(
+          alignment: Alignment.centerRight,
+          width: isOpen ? searchBarWidth : 0,
+          transform: Matrix4.translationValues(isOpen ? 0 : searchBarWidth, 0, 0),
+          duration: animationDuration,
+          height: 40.0,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15.0),
+            border: Border.all(
+              width: 1,
+              color: Colors.grey[600]!,
+            ),
+          ),
+          child: TextField(
+            key: _formKey,
+            focusNode: textFieldFocusNode,
+            onEditingComplete: toggleIsOpen,
+            textInputAction: TextInputAction.search,
+            onChanged: setCurrSearchValue,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 20,
+            ),
+            decoration: const InputDecoration(
+              contentPadding: EdgeInsets.only(bottom: 8.0),
+              prefixIcon: Icon(Icons.search, color: Color.fromARGB(0, 1, 1, 1)),
+              prefixIconConstraints: BoxConstraints(minWidth: 50.0),
+              border: InputBorder.none,
+            ),
+          ),
+        ),
+        AnimatedPadding(
+          padding: isOpen
+              ? EdgeInsets.zero
+              : EdgeInsets.only(left: searchBarWidth - 50.0),
+          duration: animationDuration,
+          child: IconButton(
+            color: isOpen ? Colors.grey[600]! : null,
+            onPressed: toggleIsOpen,
+            icon: const Icon(Icons.search),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 void deleteAll() async {
   List<FileSystemEntity> ents = await Utils.scanDir(await Utils.getFilePath);
   for (FileSystemEntity ent in ents) {
@@ -679,9 +763,10 @@ void changePage(
   ).then((_) => cb());
 }
 
-bool matchesSearchTerm(String searchTerm, Tag tag){
-  final bool matchesTitle = tag.title.contains(searchTerm);
-  final bool matchesAlbum = tag.album.contains(searchTerm);
-  final bool matchesAuthor = tag.artist.contains(searchTerm);
+bool matchesSearchTerm(String searchTerm, Tag tag) {
+  searchTerm = searchTerm.toLowerCase();
+  final bool matchesTitle = tag.title.toLowerCase().contains(searchTerm);
+  final bool matchesAlbum = tag.album.toLowerCase().contains(searchTerm);
+  final bool matchesAuthor = tag.artist.toLowerCase().contains(searchTerm);
   return matchesTitle || matchesAlbum || matchesAuthor;
 }
