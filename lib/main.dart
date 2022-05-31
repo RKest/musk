@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/widgets.dart';
 import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
 import 'utils.dart';
@@ -39,8 +38,12 @@ class _MyAppState extends State<MyApp> {
     });
     Server.listen();
   }
-
-  final scrollingController = GetIt.I.get<ScrollController>();
+  setIndex(int index) => setState(() => _currPageIndex = index);
+  int _currPageIndex = 0;
+  static final pages = <Widget>[
+    MusicPage(),
+    const PlaylistPage()
+  ];
 
   @override
   Widget build(BuildContext mainContext) {
@@ -48,38 +51,75 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       theme: ThemeData(
         colorScheme: const ColorScheme(
-            primary: Colors.black87,
-            secondary: Color.fromRGBO(15, 60, 180, 1),
-            brightness: Brightness.dark,
-            onPrimary: Colors.amber,
-            onSecondary: Colors.lightGreen,
-            error: Colors.red,
-            onError: Colors.white70,
-            background: Colors.black54,
-            onBackground: Colors.deepPurple,
-            surface: Colors.black87,
-            onSurface: Colors.blueAccent),
+          primary: Colors.black87,
+          secondary: Color.fromRGBO(15, 60, 180, 1),
+          brightness: Brightness.dark,
+          onPrimary: Colors.amber,
+          onSecondary: Colors.lightGreen,
+          error: Colors.red,
+          onError: Colors.white70,
+          background: Colors.black54,
+          onBackground: Colors.deepPurple,
+          surface: Colors.black87,
+          onSurface: Colors.blueAccent,
+        ),
       ),
       home: Scaffold(
         appBar: AppBar(
           title: const Text("Hello world!"),
         ),
-        body: Column(
-          children: [
-            TrackListControls(),
-            Expanded(
-              flex: 1,
-              child: SingleChildScrollView(
-                physics: const ScrollPhysics(),
-                child: const TrackList(),
-                controller: scrollingController,
-              ),
-            ),
-            const CurrentTackPanel()
+        body: pages[_currPageIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          items: const [
+            BottomNavigationBarItem(label: "Queue", icon: Icon(Icons.music_note),),
+            BottomNavigationBarItem(label: "Playlists", icon: Icon(Icons.library_music),),
           ],
+          currentIndex: _currPageIndex,
+          onTap: setIndex,
         ),
         floatingActionButton: const FloatingActionButton(onPressed: deleteAll),
       ),
+    );
+  }
+}
+
+class MusicPage extends StatelessWidget {
+  MusicPage({
+    Key? key,
+  }) : super(key: key);
+
+  final scrollController = GetIt.I.get<ScrollController>();
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        TrackListControls(),
+        Expanded(
+          flex: 1,
+          child: SingleChildScrollView(
+            physics: const ScrollPhysics(),
+            child: const TrackList(),
+            controller: scrollController,
+          ),
+        ),
+        const CurrentTackPanel()
+      ],
+    );
+  }
+}
+
+class PlaylistPage extends StatefulWidget {
+  const PlaylistPage({ Key? key }) : super(key: key);
+
+  @override
+  State<PlaylistPage> createState() => _PlaylistPageState();
+}
+
+class _PlaylistPageState extends State<PlaylistPage> {
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text("Hello, World!"),
     );
   }
 }
@@ -203,7 +243,7 @@ class _TrackListState extends State<TrackList> {
   @override
   void initState() {
     super.initState();
-    getTags().listen(tracksId.setTracks);
+    getTags().listen(tracksId.initTracks);
     audioPlayer.onPlayerCompletion.listen(playNextTrack);
     repeatIconIdentity.stream$.listen(setTrackLooping);
     currTrackId.stream$.listen(playTrack);
@@ -613,26 +653,42 @@ class TrackListSearchBar extends StatefulWidget with PreferredSizeWidget {
 }
 
 class TrackListSearchBarState extends State<TrackListSearchBar> {
-  bool isOpen = false;
+  final tracksId = GetIt.I.get<TracksIdentity>();
   final animationDuration = const Duration(milliseconds: 100);
   final GlobalKey _formKey = GlobalKey();
+  final textEditingController = TextEditingController();
   late FocusNode textFieldFocusNode;
+  bool isOpen = false;
   toggleIsOpen() async {
     setState(() => isOpen = !isOpen);
     await Future.delayed(animationDuration);
-    if(isOpen){
+    if (isOpen) {
       textFieldFocusNode.requestFocus();
     } else {
       textFieldFocusNode.unfocus();
     }
   }
-  setCurrSearchValue(String s) => currSearchValue = s;
-  String currSearchValue = "";
+
+  resetText() {
+    textEditingController.text = "";
+    toggleIsOpen();
+  }
 
   @override
   void initState() {
     super.initState();
     textFieldFocusNode = FocusNode();
+    textEditingController.addListener(() {
+      String text = textEditingController.text;
+      tracksId.filterTracksAccordingToSearch(text);
+    });
+  }
+
+  @override
+  void dispose() {
+    textEditingController.dispose();
+    textFieldFocusNode.dispose();
+    super.dispose();
   }
 
   @override
@@ -644,7 +700,8 @@ class TrackListSearchBarState extends State<TrackListSearchBar> {
         AnimatedContainer(
           alignment: Alignment.centerRight,
           width: isOpen ? searchBarWidth : 0,
-          transform: Matrix4.translationValues(isOpen ? 0 : searchBarWidth, 0, 0),
+          transform:
+              Matrix4.translationValues(isOpen ? 0 : searchBarWidth, 0, 0),
           duration: animationDuration,
           height: 40.0,
           decoration: BoxDecoration(
@@ -658,17 +715,15 @@ class TrackListSearchBarState extends State<TrackListSearchBar> {
           child: TextField(
             key: _formKey,
             focusNode: textFieldFocusNode,
+            controller: textEditingController,
             onEditingComplete: toggleIsOpen,
             textInputAction: TextInputAction.search,
-            onChanged: setCurrSearchValue,
             style: const TextStyle(
               color: Colors.black87,
               fontSize: 20,
             ),
             decoration: const InputDecoration(
-              contentPadding: EdgeInsets.only(bottom: 8.0),
-              prefixIcon: Icon(Icons.search, color: Color.fromARGB(0, 1, 1, 1)),
-              prefixIconConstraints: BoxConstraints(minWidth: 50.0),
+              contentPadding: EdgeInsets.fromLTRB(50.0, 0.0, 0.0, 8.0),
               border: InputBorder.none,
             ),
           ),
@@ -684,6 +739,18 @@ class TrackListSearchBarState extends State<TrackListSearchBar> {
             icon: const Icon(Icons.search),
           ),
         ),
+        Padding(
+          padding: EdgeInsets.only(left: searchBarWidth - 50.0),
+          child: AnimatedOpacity(
+            opacity: isOpen ? 1 : 0,
+            duration: animationDuration,
+            child: IconButton(
+              icon: const Icon(Icons.close),
+              color: Colors.grey[600]!,
+              onPressed: resetText,
+            ),
+          ),
+        )
       ],
     );
   }
@@ -761,12 +828,4 @@ void changePage(
     context,
     MaterialPageRoute(builder: (_) => page),
   ).then((_) => cb());
-}
-
-bool matchesSearchTerm(String searchTerm, Tag tag) {
-  searchTerm = searchTerm.toLowerCase();
-  final bool matchesTitle = tag.title.toLowerCase().contains(searchTerm);
-  final bool matchesAlbum = tag.album.toLowerCase().contains(searchTerm);
-  final bool matchesAuthor = tag.artist.toLowerCase().contains(searchTerm);
-  return matchesTitle || matchesAlbum || matchesAuthor;
 }

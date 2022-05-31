@@ -19,6 +19,12 @@ class TracksIdentity {
   final BehaviorSubject<List<Tag>> _tracksIdentity = BehaviorSubject.seeded([]);
   ValueStream<List<Tag>> get stream$ => _tracksIdentity.stream;
   List<Tag> get current => _tracksIdentity.value;
+  List<Tag> _allTracks = [];
+
+  void initTracks(List<Tag> tagList){
+    _allTracks = tagList;
+    setTracks(_allTracks);
+  }
 
   void setTracks(List<Tag> tagList){
     _tracksIdentity.add(tagList);
@@ -54,6 +60,19 @@ class TracksIdentity {
         newIndex++;
       }
     }
+  }
+
+  void filterTracksAccordingToSearch(String searchTerm){
+    setTracks(_allTracks.where((tag) => _matchesSearchTerm(searchTerm, tag)).toList());
+  }
+
+  bool _matchesSearchTerm(String searchTerm, Tag tag) {
+    if (searchTerm.isEmpty) return true;
+    searchTerm = searchTerm.toLowerCase();
+    final bool matchesTitle = tag.title.toLowerCase().contains(searchTerm);
+    final bool matchesAlbum = tag.album.toLowerCase().contains(searchTerm);
+    final bool matchesAuthor = tag.artist.toLowerCase().contains(searchTerm);
+    return matchesTitle || matchesAlbum || matchesAuthor;
   }
 }
 
