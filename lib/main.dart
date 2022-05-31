@@ -11,7 +11,7 @@ import 'id3.dart';
 import 'state.dart';
 import 'server.dart';
 
-const double gTrackDimentions = 65.0;
+const double gTrackDimentions = 70.0;
 
 void main() {
   GetIt.I.registerSingleton<TagIdentity>(TagIdentity());
@@ -129,11 +129,22 @@ class TrackListControls extends StatelessWidget {
               return Container();
             }
             return TrackListControl(
-                controlIcon: snapshot.data!,
-                controlsCallback: repeatIconIdentity.incrementIcon);
+              controlIcon: snapshot.data!,
+              controlsCallback: repeatIconIdentity.incrementIcon,
+            );
           },
           stream: repeatIconIdentity.stream$,
-        )
+        ),
+        Expanded(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 50.0),
+            alignment: Alignment.centerRight,
+            child: TrackListControl(
+              controlIcon: const Icon(Icons.search), 
+              controlsCallback: (){},
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -219,7 +230,7 @@ class _TrackListState extends State<TrackList> {
           itemBuilder: (context, index) {
             final Tag tag = tracks[index];
             return ListTile(
-              onTap: () => currTrackId.changeTrack(tracksId.current[index]),
+              onTap: () => currTrackId.changeTrack(tag),
               key: Key(tag.mp3Path),
               visualDensity: const VisualDensity(vertical: -4),
               minVerticalPadding: 0.0,
@@ -666,4 +677,11 @@ void changePage(
     context,
     MaterialPageRoute(builder: (_) => page),
   ).then((_) => cb());
+}
+
+bool matchesSearchTerm(String searchTerm, Tag tag){
+  final bool matchesTitle = tag.title.contains(searchTerm);
+  final bool matchesAlbum = tag.album.contains(searchTerm);
+  final bool matchesAuthor = tag.artist.contains(searchTerm);
+  return matchesTitle || matchesAlbum || matchesAuthor;
 }
