@@ -32,7 +32,6 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   String listeningAddress = "";
   startServer() async {
-    print("sstarted");
     String address = await Server.start();
     setState(() {
       listeningAddress = address;
@@ -269,7 +268,6 @@ class _TrackListState extends State<TrackList> with AutomaticKeepAliveClientMixi
 
   @override
   void initState() {
-    print("Sinited");
     super.initState();
     getTags().listen(tracksId.initTracks);
     audioPlayer.onPlayerCompletion.listen(playNextTrack);
@@ -281,6 +279,7 @@ class _TrackListState extends State<TrackList> with AutomaticKeepAliveClientMixi
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return StreamBuilder(
       stream: tracksId.stream$,
       builder: (context, AsyncSnapshot<List<Tag>> snapshot) {
