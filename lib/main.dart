@@ -32,22 +32,38 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   String listeningAddress = "";
   startServer() async {
+    print("sstarted");
     String address = await Server.start();
     setState(() {
       listeningAddress = address;
     });
     Server.listen();
   }
-  setIndex(int index) => setState(() => _currPageIndex = index);
+
+  setIndex(int index) {
+    setState(() => _currPageIndex = index);
+    pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeIn,
+    );
+  }
+
   int _currPageIndex = 0;
-  static final pages = <Widget>[
+  final pageController = PageController(initialPage: 0);
+  final pages = <Widget>[
     MusicPage(),
-    const PlaylistPage()
+    const PlaylistPage(),
   ];
 
   @override
-  Widget build(BuildContext mainContext) {
+  void initState() {
     startServer();
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext mainContext) {
     return MaterialApp(
       theme: ThemeData(
         colorScheme: const ColorScheme(
@@ -68,11 +84,22 @@ class _MyAppState extends State<MyApp> {
         appBar: AppBar(
           title: const Text("Hello world!"),
         ),
-        body: pages[_currPageIndex],
+        body: PageView(
+          controller: pageController,
+          onPageChanged: (newIndex) =>
+              setState(() => _currPageIndex = newIndex),
+          children: pages,
+        ),
         bottomNavigationBar: BottomNavigationBar(
           items: const [
-            BottomNavigationBarItem(label: "Queue", icon: Icon(Icons.music_note),),
-            BottomNavigationBarItem(label: "Playlists", icon: Icon(Icons.library_music),),
+            BottomNavigationBarItem(
+              label: "Queue",
+              icon: Icon(Icons.music_note),
+            ),
+            BottomNavigationBarItem(
+              label: "Playlists",
+              icon: Icon(Icons.library_music),
+            ),
           ],
           currentIndex: _currPageIndex,
           onTap: setIndex,
@@ -109,7 +136,7 @@ class MusicPage extends StatelessWidget {
 }
 
 class PlaylistPage extends StatefulWidget {
-  const PlaylistPage({ Key? key }) : super(key: key);
+  const PlaylistPage({Key? key}) : super(key: key);
 
   @override
   State<PlaylistPage> createState() => _PlaylistPageState();
@@ -215,7 +242,7 @@ class TrackList extends StatefulWidget {
   State<TrackList> createState() => _TrackListState();
 }
 
-class _TrackListState extends State<TrackList> {
+class _TrackListState extends State<TrackList> with AutomaticKeepAliveClientMixin<TrackList> {
   final audioPlayer = GetIt.I.get<AudioPlayer>();
   final tracksId = GetIt.I.get<TracksIdentity>();
   final currTrackId = GetIt.I.get<TagIdentity>();
@@ -242,12 +269,15 @@ class _TrackListState extends State<TrackList> {
 
   @override
   void initState() {
+    print("Sinited");
     super.initState();
     getTags().listen(tracksId.initTracks);
     audioPlayer.onPlayerCompletion.listen(playNextTrack);
     repeatIconIdentity.stream$.listen(setTrackLooping);
     currTrackId.stream$.listen(playTrack);
   }
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
