@@ -12,6 +12,7 @@ import 'state.dart';
 import 'server.dart';
 
 const double gTrackDimentions = 70.0;
+const double gIconDimentions = 50.0;
 
 void main() {
   GetIt.I.registerSingleton<TagIdentity>(TagIdentity());
@@ -43,7 +44,7 @@ class _MyAppState extends State<MyApp> {
     setState(() => _currPageIndex = index);
     pageController.animateToPage(
       index,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 200),
       curve: Curves.easeIn,
     );
   }
@@ -142,10 +143,51 @@ class PlaylistPage extends StatefulWidget {
 }
 
 class _PlaylistPageState extends State<PlaylistPage> {
+  final tracksId = GetIt.I.get<TracksIdentity>();
+  late List<List<Tag>> playlists = [tracksId.current];
+  late List<Image> playlistImages = playlists
+      .map((trackList) => trackList
+          .where((track) => track.picture != null && track.picture!.isNotEmpty)
+          .first
+          .getImage)
+      .toList();
+
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text("Hello, World!"),
+    return GridView.builder(
+      padding: const EdgeInsets.all(25.0),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 1,
+          crossAxisSpacing: 50.0,
+          mainAxisSpacing: 50.0),
+      itemCount: playlists.length + 1,
+      itemBuilder: (context, index) {
+        final isFirst = index == 0;
+        return Card(
+          child: InkWell(
+            onTap: () => print("Card $index tapped"),
+            child: Stack(
+              children: [
+                isFirst ? Image.asset("assets/add.png") : playlistImages[index - 1],
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      isFirst ? "Add playlist" : playlists[index - 1][0].title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -241,7 +283,8 @@ class TrackList extends StatefulWidget {
   State<TrackList> createState() => _TrackListState();
 }
 
-class _TrackListState extends State<TrackList> with AutomaticKeepAliveClientMixin<TrackList> {
+class _TrackListState extends State<TrackList>
+    with AutomaticKeepAliveClientMixin<TrackList> {
   final audioPlayer = GetIt.I.get<AudioPlayer>();
   final tracksId = GetIt.I.get<TracksIdentity>();
   final currTrackId = GetIt.I.get<TagIdentity>();
@@ -274,6 +317,7 @@ class _TrackListState extends State<TrackList> with AutomaticKeepAliveClientMixi
     repeatIconIdentity.stream$.listen(setTrackLooping);
     currTrackId.stream$.listen(playTrack);
   }
+
   @override
   bool get wantKeepAlive => true;
 
@@ -678,7 +722,7 @@ class TrackListSearchBar extends StatefulWidget with PreferredSizeWidget {
   State<TrackListSearchBar> createState() => TrackListSearchBarState();
 
   @override
-  Size get preferredSize => const Size.fromHeight(50.0);
+  Size get preferredSize => const Size.fromHeight(gIconDimentions);
 }
 
 class TrackListSearchBarState extends State<TrackListSearchBar> {
@@ -752,7 +796,8 @@ class TrackListSearchBarState extends State<TrackListSearchBar> {
               fontSize: 20,
             ),
             decoration: const InputDecoration(
-              contentPadding: EdgeInsets.fromLTRB(50.0, 0.0, 0.0, 8.0),
+              contentPadding:
+                  EdgeInsets.fromLTRB(gIconDimentions, 0.0, 0.0, 8.0),
               border: InputBorder.none,
             ),
           ),
@@ -760,7 +805,7 @@ class TrackListSearchBarState extends State<TrackListSearchBar> {
         AnimatedPadding(
           padding: isOpen
               ? EdgeInsets.zero
-              : EdgeInsets.only(left: searchBarWidth - 50.0),
+              : EdgeInsets.only(left: searchBarWidth - gIconDimentions),
           duration: animationDuration,
           child: IconButton(
             color: isOpen ? Colors.grey[600]! : null,
@@ -769,7 +814,7 @@ class TrackListSearchBarState extends State<TrackListSearchBar> {
           ),
         ),
         Padding(
-          padding: EdgeInsets.only(left: searchBarWidth - 50.0),
+          padding: EdgeInsets.only(left: searchBarWidth - gIconDimentions),
           child: AnimatedOpacity(
             opacity: isOpen ? 1 : 0,
             duration: animationDuration,
