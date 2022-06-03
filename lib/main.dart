@@ -1,3 +1,4 @@
+import 'dart:ffi';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
+import 'playlist.dart';
 import 'utils.dart';
 import 'id3.dart';
 import 'state.dart';
@@ -20,6 +22,10 @@ void main() {
   GetIt.I.registerSingleton<TracksIdentity>(TracksIdentity());
   GetIt.I.registerSingleton<ImagePicker>(ImagePicker());
   GetIt.I.registerSingleton<ScrollController>(ScrollController());
+  GetIt.I.registerSingleton<PageController>(PageController());
+  GetIt.I
+      .registerSingleton<IsMakingPlaylistIdentity>(IsMakingPlaylistIdentity());
+  GetIt.I.registerSingleton<NewPlaylistIdentity>(NewPlaylistIdentity());
   runApp(const MyApp());
 }
 
@@ -31,6 +37,11 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  final pageController = GetIt.I.get<PageController>();
+  final pages = <Widget>[
+    MusicPage(),
+    const PlaylistPage(),
+  ];
   String listeningAddress = "";
   startServer() async {
     String address = await Server.start();
@@ -50,11 +61,6 @@ class _MyAppState extends State<MyApp> {
   }
 
   int _currPageIndex = 0;
-  final pageController = PageController(initialPage: 0);
-  final pages = <Widget>[
-    MusicPage(),
-    const PlaylistPage(),
-  ];
 
   @override
   void initState() {
@@ -81,14 +87,13 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       home: Scaffold(
-        appBar: AppBar(
-          title: const Text("Hello world!"),
-        ),
-        body: PageView(
-          controller: pageController,
-          onPageChanged: (newIndex) =>
-              setState(() => _currPageIndex = newIndex),
-          children: pages,
+        body: SafeArea(
+          child: PageView(
+            controller: pageController,
+            onPageChanged: (newIndex) =>
+                setState(() => _currPageIndex = newIndex),
+            children: pages,
+          ),
         ),
         bottomNavigationBar: BottomNavigationBar(
           items: const [
@@ -116,11 +121,23 @@ class MusicPage extends StatelessWidget {
   }) : super(key: key);
 
   final scrollController = GetIt.I.get<ScrollController>();
+  final isMakingPlaylistIdentity = GetIt.I.get<IsMakingPlaylistIdentity>();
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        TrackListControls(),
+        StreamBuilder(
+            stream: isMakingPlaylistIdentity.stream$,
+            builder: (context, AsyncSnapshot<bool> isCreatingPlaylistSnapshot) {
+              if (isCreatingPlaylistSnapshot.data == null ||
+                  !isCreatingPlaylistSnapshot.hasData ||
+                  !isCreatingPlaylistSnapshot.data!) {
+                return TrackListControls();
+              } else {
+                return PlaylistControls();
+              }
+            }),
         Expanded(
           flex: 1,
           child: SingleChildScrollView(
@@ -144,38 +161,112 @@ class PlaylistPage extends StatefulWidget {
 
 class _PlaylistPageState extends State<PlaylistPage> {
   final tracksId = GetIt.I.get<TracksIdentity>();
-  late List<List<Tag>> playlists = [tracksId.current];
-  late List<Image> playlistImages = playlists
-      .map((trackList) => trackList
-          .where((track) => track.picture != null && track.picture!.isNotEmpty)
-          .first
-          .getImage)
-      .toList();
+  final pageController = GetIt.I.get<PageController>();
+  final isMakingPlaylistIdentity = GetIt.I.get<IsMakingPlaylistIdentity>();
+  final newPlaylistIndentity = GetIt.I.get<NewPlaylistIdentity>();
+
+  late List<Playlist> playlists = [Playlist("All Tracks", tracksId.allTracks)];
+  late List<Image> playlistImages = setPlaylistImages();
+
+  setPlaylistImages() {
+    return playlists
+        .map((playlist) => playlist.playlist
+            .where(
+                (track) => track.picture != null && track.picture!.isNotEmpty)
+            .first
+            .getImage)
+        .toList();
+  }
+
+  navigateToTracklist() {
+    pageController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeIn,
+    );
+  }
+
+  String newPlaylistName = "";
+  handlePlaylistClick(int tileIndex) async {
+    bool isAddPlaylistButton = tileIndex == 0;
+    if (isAddPlaylistButton) {
+      bool wasPlaylistCreated = await showDialog(
+        context: context,
+        builder: (_) {
+          return AlertDialog(
+            title: const Text("Name the playlist"),
+            content: TextField(
+              onChanged: (value) => newPlaylistName = value,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("Cancel"),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text("Ok"),
+              ),
+            ],
+          );
+        },
+      );
+      if (wasPlaylistCreated) {
+        isMakingPlaylistIdentity.toggle();
+        navigateToTracklist();
+        newPlaylistIndentity.setPlaylistName(newPlaylistName);
+      } else {
+        newPlaylistName = "";
+      }
+    } else {
+      tracksId.setTracks(playlists[tileIndex - 1].playlist);
+    }
+    navigateToTracklist();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    NewPlaylistIdentity.getPlaylists().then((playlist) {
+      setState(() {
+        playlists = [...playlists, ...playlist];
+        playlistImages = setPlaylistImages();
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
       padding: const EdgeInsets.all(25.0),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 1,
-          crossAxisSpacing: 50.0,
-          mainAxisSpacing: 50.0),
+        crossAxisCount: 2,
+        childAspectRatio: 1,
+        crossAxisSpacing: 50.0,
+        mainAxisSpacing: 50.0,
+      ),
       itemCount: playlists.length + 1,
       itemBuilder: (context, index) {
         final isFirst = index == 0;
         return Card(
           child: InkWell(
-            onTap: () => print("Card $index tapped"),
+            onTap: () => handlePlaylistClick(index),
             child: Stack(
               children: [
-                isFirst ? Image.asset("assets/add.png") : playlistImages[index - 1],
+                isFirst
+                    ? Image.asset("assets/add.png")
+                    : playlistImages[index - 1],
                 Align(
                   alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
+                  child: Container(
+                    alignment: Alignment.center,
+                    margin: const EdgeInsets.only(bottom: 8.0),
+                    constraints: const BoxConstraints.expand(height: 40.0),
+                    decoration: const BoxDecoration(color: Colors.black54),
                     child: Text(
-                      isFirst ? "Add playlist" : playlists[index - 1][0].title,
+                      isFirst
+                          ? "Add playlist"
+                          : playlists[index - 1].playlistName,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 18,
@@ -188,6 +279,44 @@ class _PlaylistPageState extends State<PlaylistPage> {
           ),
         );
       },
+    );
+  }
+}
+
+class PlaylistControls extends StatelessWidget {
+  PlaylistControls({Key? key}) : super(key: key);
+  final newPlaylistId = GetIt.I.get<NewPlaylistIdentity>();
+  final isMakingPlaylistId = GetIt.I.get<IsMakingPlaylistIdentity>();
+  final tracksId = GetIt.I.get<TracksIdentity>();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Row(children: [
+          TrackListControl(
+            controlIcon: const Icon(Icons.add),
+            controlsCallback: () =>
+                newPlaylistId.addPaths(tracksId.currentPaths),
+          ),
+          TrackListControl(
+            controlIcon: const Icon(Icons.remove),
+            controlsCallback: () =>
+                newPlaylistId.removePaths(tracksId.currentPaths),
+          ),
+          TrackListControl(
+            controlIcon: const Icon(Icons.save),
+            controlsCallback: () {
+              newPlaylistId.savePlaylist();
+              isMakingPlaylistId.toggle();
+            },
+          ),
+        ]),
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: TrackListSearchBar(),
+        ),
+      ],
     );
   }
 }
@@ -212,44 +341,38 @@ class TrackListControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    return Row(
       children: [
-        Row(
-          children: [
-            TrackListControl(
-              controlIcon: const Icon(Icons.sort_by_alpha),
-              controlsCallback: () {
-                tracksId.sortTrackAlphabetically();
-                scrollToCurrentTrack();
-              },
-            ),
-            TrackListControl(
-              controlIcon: const Icon(Icons.shuffle),
-              controlsCallback: () {
-                final int? currTrackIndex = currentTrackIndex();
-                tracksId.shuffleTracks(currTrackIndex);
-              },
-            ),
-            TrackListControl(
-              controlIcon: const Icon(Icons.refresh),
-              controlsCallback: tracksId.refreshTracks,
-            ),
-            StreamBuilder(
-              builder: (context, AsyncSnapshot<Icon> snapshot) {
-                if (snapshot.data == null || !snapshot.hasData) {
-                  return Container();
-                }
-                return TrackListControl(
-                  controlIcon: snapshot.data!,
-                  controlsCallback: repeatIconIdentity.incrementIcon,
-                );
-              },
-              stream: repeatIconIdentity.stream$,
-            ),
-          ],
+        TrackListControl(
+          controlIcon: const Icon(Icons.sort_by_alpha),
+          controlsCallback: () {
+            tracksId.sortTrackAlphabetically();
+            scrollToCurrentTrack();
+          },
         ),
-        const Align(
-            alignment: Alignment.centerLeft, child: TrackListSearchBar())
+        TrackListControl(
+          controlIcon: const Icon(Icons.shuffle),
+          controlsCallback: () {
+            final int? currTrackIndex = currentTrackIndex();
+            tracksId.shuffleTracks(currTrackIndex);
+          },
+        ),
+        TrackListControl(
+          controlIcon: const Icon(Icons.refresh),
+          controlsCallback: tracksId.refreshTracks,
+        ),
+        StreamBuilder(
+          builder: (context, AsyncSnapshot<Icon> snapshot) {
+            if (snapshot.data == null || !snapshot.hasData) {
+              return Container();
+            }
+            return TrackListControl(
+              controlIcon: snapshot.data!,
+              controlsCallback: repeatIconIdentity.incrementIcon,
+            );
+          },
+          stream: repeatIconIdentity.stream$,
+        ),
       ],
     );
   }
@@ -288,6 +411,8 @@ class _TrackListState extends State<TrackList>
   final audioPlayer = GetIt.I.get<AudioPlayer>();
   final tracksId = GetIt.I.get<TracksIdentity>();
   final currTrackId = GetIt.I.get<TagIdentity>();
+  final isMakingPlaylistId = GetIt.I.get<IsMakingPlaylistIdentity>();
+  final newPlaylistId = GetIt.I.get<NewPlaylistIdentity>();
   final RepeatIconIdentity repeatIconIdentity = RepeatIconIdentity();
 
   setTrackLooping(Icon _) {
@@ -309,6 +434,23 @@ class _TrackListState extends State<TrackList>
     }
   }
 
+  trackOnTap(Tag tag) {
+    if (isMakingPlaylistId.current) {
+      if (newPlaylistId.current.mp3Paths.contains(tag.mp3Path)) {
+        newPlaylistId.removePath(tag.mp3Path);
+      } else {
+        newPlaylistId.addPath(tag.mp3Path);
+      }
+    } else {
+      currTrackId.changeTrack(tag);
+    }
+  }
+
+  refreshTracks(_) => setState(() => nullptr);
+  isEnabled(Tag tag) =>
+      !isMakingPlaylistId.current ||
+      newPlaylistId.current.mp3Paths.contains(tag.mp3Path);
+
   @override
   void initState() {
     super.initState();
@@ -316,6 +458,8 @@ class _TrackListState extends State<TrackList>
     audioPlayer.onPlayerCompletion.listen(playNextTrack);
     repeatIconIdentity.stream$.listen(setTrackLooping);
     currTrackId.stream$.listen(playTrack);
+    isMakingPlaylistId.stream$.listen(refreshTracks);
+    newPlaylistId.stream$.listen(refreshTracks);
   }
 
   @override
@@ -339,14 +483,18 @@ class _TrackListState extends State<TrackList>
           itemCount: tracks.length,
           itemBuilder: (context, index) {
             final Tag tag = tracks[index];
-            return ListTile(
-              onTap: () => currTrackId.changeTrack(tag),
+            return AnimatedOpacity(
               key: Key(tag.mp3Path),
-              visualDensity: const VisualDensity(vertical: -4),
-              minVerticalPadding: 0.0,
-              contentPadding: const EdgeInsets.all(0.0),
-              title: TrackInformations(tag),
-              trailing: TrackOptions(tag, index),
+              opacity: isEnabled(tag) ? 1.0 : 0.7,
+              duration: const Duration(milliseconds: 200),
+              child: ListTile(
+                onTap: () => trackOnTap(tag),
+                visualDensity: const VisualDensity(vertical: -4),
+                minVerticalPadding: 0.0,
+                contentPadding: const EdgeInsets.all(0.0),
+                title: TrackInformations(tag),
+                trailing: TrackOptions(tag, index),
+              ),
             );
           },
         );
