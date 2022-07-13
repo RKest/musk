@@ -1,12 +1,14 @@
-import 'dart:ffi';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:bottom_drawer/bottom_drawer.dart';
 import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import 'auto_image.dart';
 import 'playlist.dart';
 import 'utils.dart';
 import 'id3.dart';
@@ -47,6 +49,7 @@ class _MyAppState extends State<MyApp> {
     String address = await Server.start();
     setState(() {
       listeningAddress = address;
+      print(listeningAddress);
     });
     Server.listen();
   }
@@ -165,7 +168,10 @@ class _PlaylistPageState extends State<PlaylistPage> {
   final isMakingPlaylistIdentity = GetIt.I.get<IsMakingPlaylistIdentity>();
   final newPlaylistIndentity = GetIt.I.get<NewPlaylistIdentity>();
 
-  late List<Playlist> playlists = [Playlist("All Tracks", tracksId.allTracks)];
+  late List<Playlist> playlists = [
+    if (tracksId.allTracks.isNotEmpty)
+      Playlist("All Tracks", tracksId.allTracks)
+  ];
   late List<Image> playlistImages = setPlaylistImages();
 
   setPlaylistImages() {
@@ -446,7 +452,7 @@ class _TrackListState extends State<TrackList>
     }
   }
 
-  refreshTracks(_) => setState(() => nullptr);
+  refreshTracks(_) => setState(() => null);
   isEnabled(Tag tag) =>
       !isMakingPlaylistId.current ||
       newPlaylistId.current.mp3Paths.contains(tag.mp3Path);
@@ -772,6 +778,11 @@ class _TagChangePanelState extends State<TagChangePanel> {
   late String albumString;
   XFile? pictureFile;
 
+  final BottomDrawerController drawerController = BottomDrawerController();
+  bool isDrawerOpen = false;
+
+  late List<String> autoImageUrls = [];
+
   @override
   void initState() {
     super.initState();
@@ -794,8 +805,32 @@ class _TagChangePanelState extends State<TagChangePanel> {
     });
   }
 
-  pickImage() async {
+  pickImage() {
+    if (isDrawerOpen) {
+      drawerController.close();
+    } else {
+      drawerController.open();
+    }
+  }
+
+  pickLocalImage() async {
+    drawerController.close();
     pictureFile = await imagePicker.pickImage(source: ImageSource.gallery);
+  }
+
+  pickAutoImage() async {
+    drawerController.close();
+    try {
+      final autoImage = AutoImage(widget.tag);
+      final imageUrls = await autoImage.getImages();
+      setState(() {
+        autoImageUrls = imageUrls;
+      });
+    } catch (error) {
+      print(error);
+      final snackBar = SnackBar(content: Text(error.toString()));
+      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+    }
   }
 
   saveNewTag() async {
@@ -812,65 +847,136 @@ class _TagChangePanelState extends State<TagChangePanel> {
     });
   }
 
+  saveImage(String uri) async {
+    final res = await http.get(Uri.parse(uri));
+    final oldTag = widget.tag;
+    widget.tag.picture = res.bodyBytes;
+    Tag.updateWithNewValues(oldTag, widget.tag);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
-      child: Column(
+      child: Stack(
         children: [
-          GestureDetector(
-            onTap: pickImage,
-            child: SizedBox(
-              height: 100.0,
-              width: 100.0,
-              child: widget.tag.getImage,
-            ),
+          Column(
+            children: [
+              GestureDetector(
+                onTap: pickImage,
+                child: SizedBox(
+                  height: 100.0,
+                  width: 100.0,
+                  child: widget.tag.getImage,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: TextFormField(
+                  controller: titleControler,
+                  decoration:
+                      const InputDecoration(border: OutlineInputBorder()),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: TextFormField(
+                  controller: artistControler,
+                  decoration:
+                      const InputDecoration(border: OutlineInputBorder()),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: TextFormField(
+                  controller: albumControler,
+                  decoration:
+                      const InputDecoration(border: OutlineInputBorder()),
+                ),
+              ),
+              SizedBox(
+                width: 300,
+                height: 60,
+                child: IconButton(
+                  icon: const Icon(Icons.save),
+                  onPressed: saveNewTag,
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.max,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  for (String uri in autoImageUrls)
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        constraints: const BoxConstraints(maxHeight: 100.0),
+                        child: GestureDetector(
+                          onTap: () => saveImage(uri),
+                          child: Image.network(uri),
+                        ),
+                      ),
+                    )
+                ],
+              ),
+            ],
+            mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextFormField(
-              controller: titleControler,
-              decoration: const InputDecoration(border: OutlineInputBorder()),
+          BottomDrawer(
+            header: Container(),
+            color: Colors.transparent,
+            body: Row(
+              children: [
+                ImagePickOption(Icons.folder, pickLocalImage),
+                ImagePickOption(Icons.auto_awesome, pickAutoImage),
+              ],
+              mainAxisAlignment: MainAxisAlignment.start,
+              mainAxisSize: MainAxisSize.max,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
             ),
+            headerHeight: 0.0,
+            drawerHeight: gIconDimentions,
+            controller: drawerController,
+            callback: (draweState) => isDrawerOpen = draweState,
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextFormField(
-              controller: artistControler,
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextFormField(
-              controller: albumControler,
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-            ),
-          ),
-          SizedBox(
-            width: 300,
-            height: 60,
-            child: IconButton(
-              icon: const Icon(Icons.save),
-              onPressed: saveNewTag,
-            ),
-          )
         ],
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
       ),
     );
   }
 }
 
-class TrackListSearchBar extends StatefulWidget with PreferredSizeWidget {
+class ImagePickOption extends StatelessWidget {
+  const ImagePickOption(
+    this.iconData,
+    this.pickFunc, {
+    Key? key,
+  }) : super(key: key);
+  final IconData iconData;
+  final VoidCallback pickFunc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        color: Colors.transparent,
+        child: InkWell(
+          splashColor: Colors.white,
+          onTap: pickFunc,
+          child: Icon(
+            iconData,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class TrackListSearchBar extends StatefulWidget {
   const TrackListSearchBar({Key? key}) : super(key: key);
 
   @override
   State<TrackListSearchBar> createState() => TrackListSearchBarState();
-
-  @override
-  Size get preferredSize => const Size.fromHeight(gIconDimentions);
 }
 
 class TrackListSearchBarState extends State<TrackListSearchBar> {
