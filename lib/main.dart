@@ -7,7 +7,6 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:bottom_drawer/bottom_drawer.dart';
 import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
 import 'auto_image.dart';
 import 'playlist.dart';
 import 'utils.dart';
@@ -40,6 +39,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final pageController = GetIt.I.get<PageController>();
+  final tracksId = GetIt.I.get<TracksIdentity>();
   final pages = <Widget>[
     MusicPage(),
     const PlaylistPage(),
@@ -533,7 +533,11 @@ class _TrackInformationsState extends State<TrackInformations> {
         SizedBox(
           width: gTrackDimentions,
           height: gTrackDimentions,
-          child: trackImage,
+          child: FittedBox(
+            child: trackImage,
+            fit: BoxFit.cover,
+            clipBehavior: Clip.hardEdge,
+          ),
         ),
         Expanded(
           flex: 1,
@@ -776,6 +780,8 @@ class _TagChangePanelState extends State<TagChangePanel> {
   late String titleString;
   late String artistString;
   late String albumString;
+  late String imageUri;
+  late Image tagImage = widget.tag.getImage;
   XFile? pictureFile;
 
   final BottomDrawerController drawerController = BottomDrawerController();
@@ -789,6 +795,7 @@ class _TagChangePanelState extends State<TagChangePanel> {
     titleString = widget.tag.title;
     artistString = widget.tag.artist;
     albumString = widget.tag.album;
+    imageUri = "";
 
     titleControler.text = titleString;
     artistControler.text = artistString;
@@ -838,9 +845,15 @@ class _TagChangePanelState extends State<TagChangePanel> {
     tagCp.title = titleString;
     tagCp.artist = artistString;
     tagCp.album = albumString;
-    if (pictureFile != null) {
-      tagCp.setPicture(pictureFile!);
+
+    if (imageUri.isNotEmpty) {
+      print("SET FROM URI");
+      await tagCp.setPictureFromUri(imageUri);
+    } else if (pictureFile != null) {
+      print("SET FROM FILE");
+      await tagCp.setPictureFromFile(pictureFile!);
     }
+
     Tag.updateWithNewValues(widget.tag, tagCp).then((_) {
       tracksId.current[widget.tagInx] = tagCp;
       Navigator.pop(context);
@@ -848,10 +861,11 @@ class _TagChangePanelState extends State<TagChangePanel> {
   }
 
   saveImage(String uri) async {
-    final res = await http.get(Uri.parse(uri));
-    final oldTag = widget.tag;
-    widget.tag.picture = res.bodyBytes;
-    Tag.updateWithNewValues(oldTag, widget.tag);
+    print("SAVED URI");
+    setState(() {
+      tagImage = Image.network(uri);
+    });
+    imageUri = uri;
   }
 
   @override
@@ -866,7 +880,11 @@ class _TagChangePanelState extends State<TagChangePanel> {
                 child: SizedBox(
                   height: 100.0,
                   width: 100.0,
-                  child: widget.tag.getImage,
+                  child: FittedBox(
+                    clipBehavior: Clip.hardEdge,
+                    fit: BoxFit.cover,
+                    child: tagImage,
+                  ),
                 ),
               ),
               Padding(
@@ -906,13 +924,18 @@ class _TagChangePanelState extends State<TagChangePanel> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   for (String uri in autoImageUrls)
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                        constraints: const BoxConstraints(maxHeight: 100.0),
-                        child: GestureDetector(
-                          onTap: () => saveImage(uri),
-                          child: Image.network(uri),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: SizedBox(
+                        height: 100.0,
+                        width: 100.0,
+                        child: FittedBox(
+                          fit: BoxFit.cover,
+                          clipBehavior: Clip.hardEdge,
+                          child: GestureDetector(
+                            onTap: () => saveImage(uri),
+                            child: Image.network(uri),
+                          ),
                         ),
                       ),
                     )

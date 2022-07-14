@@ -1,12 +1,13 @@
 import 'dart:typed_data';
 
+import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:http/http.dart' show get;
 import 'dart:io';
 
-class Utils
-{
+class Utils {
   static Future<String?> get localIp async {
     final info = NetworkInfo();
     return info.getWifiIP();
@@ -47,10 +48,10 @@ class Utils
 
   static void writeAtPostion(String path, Uint8List data, int position) async {
     final File fileForWriting = File(path);
-    final RandomAccessFile raf = await fileForWriting.open(mode: FileMode.append);
+    final RandomAccessFile raf =
+        await fileForWriting.open(mode: FileMode.append);
     final RandomAccessFile f1 = await raf.setPosition(position);
     await f1.writeFrom(data);
     await f1.close();
   }
 }
-

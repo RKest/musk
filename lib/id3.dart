@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' show get, Response;
 
 class Tag {
   static const Map<String, String> _assocMap = {
@@ -37,12 +38,25 @@ class Tag {
     _data["album"] = newVal;
   }
 
-  setPicture(XFile pictureFile) async {
-    final String mime = pictureFile.mimeType ?? "image/${pictureFile.name.split('.').last}";
-    final EncodedString encodedMimetype = EncodedString(mime);
+  setPictureFromFile(XFile pictureFile) async {
+    final String mime =
+        pictureFile.mimeType ?? "image/${pictureFile.name.split('.').last}";
     final Uint8List pictureBinData = await pictureFile.readAsBytes();
+    _setPictureBytes(mime, pictureBinData);
+  }
+
+  setPictureFromUri(String uri) async {
+    final Response res = await get(Uri.parse(uri));
+    final Uint8List pictureBinData = res.bodyBytes;
+    final String ext = uri.split('.').last;
+    final String mime = "image/$ext";
+    _setPictureBytes(mime, pictureBinData);
+  }
+
+  _setPictureBytes(String mime, Uint8List pictureBinData) {
+    final EncodedString encodedMimetype = EncodedString(mime);
     final Uint8List bytes = Uint8List.fromList([
-      ...encodedMimetype.headerBytes(), 
+      ...encodedMimetype.headerBytes(),
       ...encodedMimetype.writeableBytes(),
       ...encodedMimetype.nullTerminator(),
       0x03, // <-- picture type of "Front Cover",
@@ -77,8 +91,7 @@ class Tag {
   Uint8List? picture;
   String mp3Path;
 
-  Tag.fromBytes(Uint8List bytes, this.mp3Path)
-  {
+  Tag.fromBytes(Uint8List bytes, this.mp3Path) {
     if (listEquals(bytes.sublist(0, 5), [73, 68, 51, 3, 0])) {
       final int tagSize = ID3.decodeTagSize(bytes.sublist(6, 10));
       // ignore: unused_local_variable
@@ -128,8 +141,9 @@ class Tag {
         Uint8List.fromList([0x49, 0x44, 0x33, 3, 0, 0, 1, 1, 1, 1]);
 
     _data.forEach((key, val) {
-      if (val != "Unknown"){
-        final EncodedString encodedFrameCode = EncodedString(_revAssocMap[key]!);
+      if (val != "Unknown") {
+        final EncodedString encodedFrameCode =
+            EncodedString(_revAssocMap[key]!);
         final EncodedString encodedFrameVal = EncodedString(val);
         final Uint8List frameCodeBytes = encodedFrameCode.writeableBytes();
         final Uint8List frameSizeBytes =
@@ -149,12 +163,12 @@ class Tag {
       }
     });
 
-    if (picture != null){
+    if (picture != null) {
       final EncodedString encodedFrameCode = EncodedString('APIC');
       final Uint8List frameCodeBytes = encodedFrameCode.writeableBytes();
       final Uint8List frameSizeBytes = ID3.encodeFrameSize(picture!.length);
       final Uint8List frameFlags = Uint8List.fromList([0x00, 0x00]);
-      
+
       encodedTag = Uint8List.fromList([
         ...encodedTag,
         ...frameCodeBytes,
@@ -176,11 +190,13 @@ class Tag {
   static Future<void> updateWithNewValues(Tag oldTag, Tag newTag) async {
     final String pathToChange = oldTag.mp3Path;
     final Uint8List oldTagBytes = await File(pathToChange).readAsBytes();
-    final int oldTagSize = ID3.decodeTagSize(oldTagBytes.sublist(6,10)) + 10; // + 10 for the 10 bytes before actual tag data
+    final int oldTagSize = ID3.decodeTagSize(oldTagBytes.sublist(6, 10)) +
+        10; // + 10 for the 10 bytes before actual tag data
     final Uint8List newEncodedTag = newTag.encode();
     final File newFile = File(pathToChange);
     await newFile.writeAsBytes(newEncodedTag, mode: FileMode.write);
-    await newFile.writeAsBytes(oldTagBytes.sublist(oldTagSize), mode: FileMode.append);
+    await newFile.writeAsBytes(oldTagBytes.sublist(oldTagSize),
+        mode: FileMode.append);
   }
 }
 
