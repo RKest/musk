@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
-import '../logic/state.dart';
-import '../logic/server.dart';
+import 'logic/state.dart';
+import 'logic/server.dart';
 
-import 'MusicPage/main.dart';
-import 'PlaylistPage/main.dart';
-import 'functions.dart';
+import 'widgets/MusicPage/main.dart';
+import 'widgets/PlaylistPage/main.dart';
+import 'widgets/functions.dart';
 
 void main() {
   GetIt.I.registerSingleton<TagIdentity>(TagIdentity());
