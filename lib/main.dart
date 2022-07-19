@@ -36,12 +36,10 @@ class _MyAppState extends State<MyApp> {
     MusicPage(),
     const PlaylistPage(),
   ];
-  String listeningAddress = "";
   startServer() async {
     String address = await Server.start();
     setState(() {
-      listeningAddress = address;
-      print(listeningAddress);
+      Server.listeningAddress = address;
     });
     Server.listen();
   }

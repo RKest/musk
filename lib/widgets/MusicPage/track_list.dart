@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../logic/id3.dart';
 import '../../logic/state.dart';
+import '../../logic/server.dart';
 import '../functions.dart';
 import 'track_informations.dart';
 import 'track_options.dart';
@@ -81,7 +82,9 @@ class _TrackListState extends State<TrackList>
       builder: (context, AsyncSnapshot<List<Tag>> snapshot) {
         final tracks = snapshot.data;
         if (tracks == null || tracks.isEmpty) {
-          return Container();
+          return Center(
+            child: Text(Server.listeningAddress),
+          );
         }
         return ReorderableListView.builder(
           shrinkWrap: true,
