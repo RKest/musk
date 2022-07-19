@@ -6,9 +6,11 @@ import 'algs.dart';
 import 'id3.dart';
 import 'package:http/http.dart' as http;
 
-const baseHost = "contextualwebsearch-websearch-v1.p.rapidapi.com";
+//https://serpapi.com/search.json?q=Apple&tbm=isch&ijn=0&api_key=1a169cc8bfc08e7b3bec08e0d7ca2ce9ea02d36620f3643aec79271da0d76884
+
+const baseHost = "serpapi.com";
 const baseScheme = "https";
-const basePath = "/api/Search/ImageSearchAPI/";
+const basePath = "/search.json/";
 
 class AutoImage {
   final String _terms;
@@ -21,65 +23,52 @@ class AutoImage {
             .value;
 
   Future<List<String>> getImages() async {
-    final uri = _query();
     final apikey = await rootBundle.loadString('assets/apikey.txt');
-    final res = await http.get(uri, headers: {
-      'X-RapidAPI-Key': apikey,
-      'X-RapidAPI-Host': 'contextualwebsearch-websearch-v1.p.rapidapi.com'
-    });
-    // final res = await rootBundle.loadString('assets/test.json');
-    final parsedRes = ImageRes.fromJson(res.body); //res.body
-    final filteredImages =
-        parsedRes.values.where((img) => img.height == img.width).toList();
-    final restImages =
-        parsedRes.values.where((img) => img.height != img.width).toList();
-    final allImages = [...filteredImages, ...restImages];
-    final filteredImageUrls = allImages
-        .sublist(0, min(allImages.length, 3))
+    final uri = _query(apikey);
+    final res = await http.get(uri);
+    // Local testing
+    // final json = await rootBundle.loadString('assets/test.json');
+    final json = res.body;
+    final parsedRes = ImageRes.fromJson(json).values; //res.body
+    final filteredImageUrls = parsedRes
         .map((img) => img.url)
-        .toList();
+        .where(doesntEndWith('svg'))
+        .toList()
+        .sublist(0, min(parsedRes.length, 3));
     return filteredImageUrls;
   }
 
-  Uri _query() {
+  Uri _query(String apiKey) {
     return Uri(
       scheme: baseScheme,
       host: baseHost,
       path: basePath,
       queryParameters: {
         "q": _terms,
-        "pageNumber": '1',
-        "pageSize": '10',
-        "autoCorrect": 'true'
+        "tbm": 'isch',
+        "ijn": '0',
+        "api_key": apiKey
       },
     );
   }
 }
 
 class ImageRes {
-  final String type;
-  final int totalCount;
   final List<ImageInstance> values;
-  ImageRes(this.type, this.totalCount, this.values);
+  ImageRes(this.values);
   factory ImageRes.fromJson(String sjson) {
     final json = jsonDecode(sjson);
-    final type = json['_type'];
-    final totalCount = json['totalCount'];
-    final List<dynamic> jsonValues = json['value'];
+    final List<dynamic> jsonValues = json['images_results'];
     final values = jsonValues.map(ImageInstance.fromJson).toList();
-    return ImageRes(type, totalCount, values);
+    return ImageRes(values);
   }
 }
 
 class ImageInstance {
   final String url;
-  final int height;
-  final int width;
-  ImageInstance(this.url, this.height, this.width);
+  ImageInstance(this.url);
   factory ImageInstance.fromJson(dynamic json) {
-    final url = json['url'];
-    final height = json['height'];
-    final width = json['width'];
-    return ImageInstance(url, height, width);
+    final url = json['original'];
+    return ImageInstance(url);
   }
 }

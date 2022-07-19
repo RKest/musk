@@ -82,7 +82,6 @@ class _TagChangePanelState extends State<TagChangePanel> {
         autoImageUrls = imageUrls;
       });
     } catch (error) {
-      print(error);
       final snackBar = SnackBar(content: Text(error.toString()));
       ScaffoldMessenger.of(context).showSnackBar(snackBar);
     }
@@ -95,10 +94,8 @@ class _TagChangePanelState extends State<TagChangePanel> {
     tagCp.album = albumString;
 
     if (imageUri.isNotEmpty) {
-      print("SET FROM URI");
       await tagCp.setPictureFromUri(imageUri);
     } else if (pictureFile != null) {
-      print("SET FROM FILE");
       await tagCp.setPictureFromFile(pictureFile!);
     }
 
@@ -109,7 +106,6 @@ class _TagChangePanelState extends State<TagChangePanel> {
   }
 
   saveImage(String uri) async {
-    print("SAVED URI");
     setState(() {
       tagImage = Image.network(uri);
     });

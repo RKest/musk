@@ -20,6 +20,9 @@ void swap(List elements, int inx1, int inx2) {
   elements[inx2] = temp;
 }
 
+bool Function(String el) doesntEndWith(String ending) =>
+    (String el) => !el.endsWith(ending);
+
 class Checker<T> {
   final bool _doesThrow;
   final String? _err;
