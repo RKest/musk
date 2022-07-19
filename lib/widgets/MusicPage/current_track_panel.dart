@@ -6,7 +6,7 @@ import 'package:get_it/get_it.dart';
 
 import '../../logic/state.dart';
 import '../../logic/id3.dart';
-import '../functions.dart';
+import '../../functions.dart';
 
 class CurrentTackPanel extends StatefulWidget {
   const CurrentTackPanel({Key? key}) : super(key: key);

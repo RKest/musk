@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import '../logic/state.dart';
 import '../logic/constants.dart';
-import 'functions.dart';
+import '../functions.dart';
 
 class TrackListControls extends StatelessWidget {
   TrackListControls({Key? key}) : super(key: key);

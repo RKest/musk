@@ -7,7 +7,7 @@ import 'logic/server.dart';
 
 import 'widgets/MusicPage/main.dart';
 import 'widgets/PlaylistPage/main.dart';
-import 'widgets/functions.dart';
+import 'functions.dart';
 
 void main() {
   GetIt.I.registerSingleton<TagIdentity>(TagIdentity());
@@ -41,7 +41,11 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       Server.listeningAddress = address;
     });
-    Server.listen();
+    Server.listen(() async {
+      await for (final tracks in getTags()) {
+        tracksId.setTracks(tracks);
+      }
+    });
   }
 
   setIndex(int index) {

@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/rendering.dart';
+
 import 'multipart.dart';
 import 'utils.dart';
 
@@ -14,7 +16,7 @@ class Server {
     return listeningAddress;
   }
 
-  static void listen() async {
+  static void listen(VoidCallback callback) async {
     if (server == null) {
       throw "Start the server with Server.start()";
     }
@@ -47,7 +49,7 @@ class Server {
         final String fileName = Multipart.getFilename(data);
         await Utils.saveToFile(
             fileName, data.sublist(dataStartIndex, dataEndIndex));
-        print("Done");
+        callback();
         request.response.close();
       }
     }

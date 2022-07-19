@@ -2,7 +2,7 @@ import 'package:get_it/get_it.dart';
 import 'package:flutter/material.dart';
 import '../../logic/state.dart';
 import '../../logic/id3.dart';
-import '../functions.dart';
+import '../../functions.dart';
 import 'tag_change_panel.dart';
 
 class TrackOptions extends StatelessWidget {

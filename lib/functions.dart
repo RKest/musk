@@ -5,9 +5,9 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
-import '../logic/id3.dart';
-import '../logic/state.dart';
-import '../logic/utils.dart';
+import 'logic/id3.dart';
+import 'logic/state.dart';
+import 'logic/utils.dart';
 
 void deleteAll() async {
   List<FileSystemEntity> ents = await Utils.scanDir(await Utils.getFilePath);

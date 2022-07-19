@@ -4,7 +4,7 @@ import 'package:audioplayers/audioplayers.dart';
 import '../../logic/id3.dart';
 import '../../logic/state.dart';
 import '../../logic/server.dart';
-import '../functions.dart';
+import '../../functions.dart';
 import 'track_informations.dart';
 import 'track_options.dart';
 
