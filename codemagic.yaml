@@ -1,0 +1,6 @@
+workflows:
+  musk:
+    name: Ios build
+    scripts:
+      - name: Build
+        script: flutter build ios
