@@ -10,9 +10,9 @@ class Server {
   static String listeningAddress = "";
   static HttpServer? server;
   static Future<String> start() async {
-    server = await HttpServer.bind(InternetAddress.anyIPv4, 8080);
-    String ip = await Utils.localIp ?? "Err while getting the ip";
-    listeningAddress = "$ip:${server?.port}";
+    final listeningIp = InternetAddress.anyIPv4;
+    server = await HttpServer.bind(listeningIp, 8080);
+    listeningAddress = "${listeningIp.address}:${server?.port}";
     return listeningAddress;
   }
 

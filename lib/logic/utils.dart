@@ -1,16 +1,10 @@
 import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
-import 'package:network_info_plus/network_info_plus.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'dart:io';
 
 class Utils {
-  static Future<String?> get localIp async {
-    final info = NetworkInfo();
-    return info.getWifiIP();
-  }
-
   static Future<String> get getFilePath async {
     final directory = await getApplicationDocumentsDirectory();
     return directory.path;
