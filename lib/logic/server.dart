@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/rendering.dart';
+import 'package:r_get_ip/r_get_ip.dart';
 
 import 'multipart.dart';
 import 'utils.dart';
@@ -10,10 +11,15 @@ class Server {
   static String listeningAddress = "";
   static HttpServer? server;
   static Future<String> start() async {
-    final listeningIp = InternetAddress.anyIPv4;
-    server = await HttpServer.bind(listeningIp, 8080);
-    listeningAddress = "${listeningIp.address}:${server?.port}";
-    return listeningAddress;
+    try {
+      server = await HttpServer.bind(InternetAddress.anyIPv4, 8080);
+      final ip = await RGetIp.internalIP;
+      listeningAddress = "$ip:${server?.port}";
+      return listeningAddress;
+    } catch (e) {
+      listeningAddress = e.toString();
+      return listeningAddress;
+    }
   }
 
   static void listen(VoidCallback callback) async {

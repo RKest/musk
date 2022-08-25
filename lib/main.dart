@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:musk/logic/audio_player.dart';
 import 'logic/state.dart';
 import 'logic/server.dart';
 
@@ -10,8 +11,8 @@ import 'widgets/PlaylistPage/main.dart';
 import 'functions.dart';
 
 void main() {
-  GetIt.I.registerSingleton<TagIdentity>(TagIdentity());
   GetIt.I.registerSingleton<AudioPlayer>(AudioPlayer());
+  GetIt.I.registerSingleton<TagIdentity>(TagIdentity());
   GetIt.I.registerSingleton<TracksIdentity>(TracksIdentity());
   GetIt.I.registerSingleton<ImagePicker>(ImagePicker());
   GetIt.I.registerSingleton<ScrollController>(ScrollController());
@@ -19,6 +20,7 @@ void main() {
   GetIt.I
       .registerSingleton<IsMakingPlaylistIdentity>(IsMakingPlaylistIdentity());
   GetIt.I.registerSingleton<NewPlaylistIdentity>(NewPlaylistIdentity());
+  GetIt.I.registerSingleton<MyAudioPlayer>(MyAudioPlayer());
   runApp(const MyApp());
 }
 

@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:musk/logic/audio_player.dart';
 import '../../logic/id3.dart';
 import '../../logic/state.dart';
 import '../../logic/server.dart';
@@ -17,30 +18,15 @@ class TrackList extends StatefulWidget {
 
 class _TrackListState extends State<TrackList>
     with AutomaticKeepAliveClientMixin<TrackList> {
-  final audioPlayer = GetIt.I.get<AudioPlayer>();
+  final myAudioPlayer = GetIt.I.get<MyAudioPlayer>();
   final tracksId = GetIt.I.get<TracksIdentity>();
   final currTrackId = GetIt.I.get<TagIdentity>();
   final newPlaylistId = GetIt.I.get<NewPlaylistIdentity>();
   final isMakingPlaylistId = GetIt.I.get<IsMakingPlaylistIdentity>();
   final RepeatIconIdentity repeatIconIdentity = RepeatIconIdentity();
 
-  setTrackLooping(Icon _) {
-    switch (RepeatIconIdentity.currentRepeatValue) {
-      case RepeatEnum.disabled:
-        audioPlayer.setReleaseMode(ReleaseMode.STOP);
-        break;
-      case RepeatEnum.repeat:
-        audioPlayer.setReleaseMode(ReleaseMode.STOP);
-        break;
-      case RepeatEnum.repeatOnce:
-        audioPlayer.setReleaseMode(ReleaseMode.LOOP);
-    }
-  }
-
   playTrack(Tag tag) {
-    if (tag.mp3Path.isNotEmpty) {
-      audioPlayer.play(tag.mp3Path, isLocal: true, stayAwake: true);
-    }
+    myAudioPlayer.play(tag.mp3Path);
   }
 
   trackOnTap(Tag tag) {
@@ -64,8 +50,6 @@ class _TrackListState extends State<TrackList>
   void initState() {
     super.initState();
     getTags().listen(tracksId.initTracks);
-    audioPlayer.onPlayerCompletion.listen(playNextTrack);
-    repeatIconIdentity.stream$.listen(setTrackLooping);
     currTrackId.stream$.listen(playTrack);
     isMakingPlaylistId.stream$.listen(refreshTracks);
     newPlaylistId.stream$.listen(refreshTracks);

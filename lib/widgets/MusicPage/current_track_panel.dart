@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
+import 'package:musk/logic/audio_player.dart';
 
 import '../../logic/state.dart';
 import '../../logic/id3.dart';
@@ -17,61 +18,40 @@ class CurrentTackPanel extends StatefulWidget {
 
 class _CurrentTackPanelState extends State<CurrentTackPanel> {
   final tagId = GetIt.I.get<TagIdentity>();
-  final audioPlayer = GetIt.I.get<AudioPlayer>();
-
-  int totalTrackDuration = 1;
-  int currentProgress = 0;
-  double _durationSliderVal = 0.0;
-  Icon playPauseIcon = const Icon(Icons.pause);
-  PlayerState currPlayerState = PlayerState.PAUSED;
+  final myAudioPlayer = GetIt.I.get<MyAudioPlayer>();
 
   setTotalTrackDuration(Duration _) {
-    audioPlayer.getDuration().then((value) {
-      if (value != totalTrackDuration) {
-        setState(() {
-          currentProgress = 0;
-          totalTrackDuration = value;
-        });
-      }
-    });
+    myAudioPlayer.setTotalTrackDuration();
+    refreshState();
   }
 
   updateProgress(Duration durationChange) {
-    setState(() {
-      currentProgress = durationChange.inMilliseconds;
-      final double currentTrackPostion =
-          currentProgress.toDouble() / totalTrackDuration.toDouble();
-      _durationSliderVal = min(currentTrackPostion, 1.0);
-    });
+    myAudioPlayer.updateProgress(durationChange);
+    refreshState();
   }
 
   setPlayPauseIcon(PlayerState state) {
-    currPlayerState = state;
-    if (state == PlayerState.PLAYING) {
-      setState(() {
-        playPauseIcon = const Icon(Icons.pause);
-      });
-    } else {
-      setState(() {
-        playPauseIcon = const Icon(Icons.play_arrow);
-      });
-    }
+    myAudioPlayer.setPlayPauseIcon(state);
+    refreshState();
   }
 
-  playPasue() {
-    if (currPlayerState == PlayerState.PLAYING) {
-      audioPlayer.pause();
-    } else {
-      audioPlayer.resume();
-    }
+  setDurationSliderVal(double value) {
+    myAudioPlayer.setDurationSliderVal(value);
+    refreshState();
+  }
+
+  refreshState() {
+    setState(() {
+      myAudioPlayer.myState = myAudioPlayer.myState;
+    });
   }
 
   @override
   void initState() {
     super.initState();
-    audioPlayer.onAudioPositionChanged.listen(updateProgress);
-    audioPlayer.onDurationChanged.listen(setTotalTrackDuration);
-    audioPlayer.onPlayerStateChanged.listen(setPlayPauseIcon);
+    myAudioPlayer.onAudioPositionChanged.listen(updateProgress);
+    myAudioPlayer.onDurationChanged.listen(setTotalTrackDuration);
+    myAudioPlayer.onPlayerStateChanged.listen(setPlayPauseIcon);
   }
 
   @override
@@ -94,8 +74,8 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
                   icon: const Icon(Icons.fast_rewind),
                 ),
                 IconButton(
-                  onPressed: playPasue,
-                  icon: playPauseIcon,
+                  onPressed: myAudioPlayer.playPause,
+                  icon: myAudioPlayer.myState.playPauseIcon,
                 ),
                 IconButton(
                   onPressed: () => playNextTrack(null, manualTrackSkip: true),
@@ -106,20 +86,10 @@ class _CurrentTackPanelState extends State<CurrentTackPanel> {
             Padding(
               padding: const EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 16.0),
               child: Slider(
-                value: _durationSliderVal,
-                onChanged: (value) {
-                  setState(() {
-                    _durationSliderVal = value;
-                  });
-                },
-                onChangeStart: (_) {
-                  audioPlayer.pause();
-                },
-                onChangeEnd: (val) {
-                  audioPlayer.seek(Duration(
-                      milliseconds: (val * totalTrackDuration).toInt()));
-                  audioPlayer.resume();
-                },
+                value: myAudioPlayer.myState.durationSliderVal,
+                onChanged: setDurationSliderVal,
+                onChangeStart: (_) => myAudioPlayer.pause(),
+                onChangeEnd: myAudioPlayer.seekTo,
               ),
             ),
           ],
