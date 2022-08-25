@@ -1,3 +1,4 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:get_it/get_it.dart';
@@ -10,7 +11,7 @@ import 'widgets/MusicPage/main.dart';
 import 'widgets/PlaylistPage/main.dart';
 import 'functions.dart';
 
-void main() {
+void main() async {
   GetIt.I.registerSingleton<AudioPlayer>(AudioPlayer());
   GetIt.I.registerSingleton<TagIdentity>(TagIdentity());
   GetIt.I.registerSingleton<TracksIdentity>(TracksIdentity());
@@ -21,6 +22,7 @@ void main() {
       .registerSingleton<IsMakingPlaylistIdentity>(IsMakingPlaylistIdentity());
   GetIt.I.registerSingleton<NewPlaylistIdentity>(NewPlaylistIdentity());
   GetIt.I.registerSingleton<MyAudioPlayer>(MyAudioPlayer());
+  MyAudioPlayer.initAudioService();
   runApp(const MyApp());
 }
 

@@ -1,9 +1,9 @@
 import 'dart:math';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:musk/logic/audio_player.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 import '../../logic/state.dart';
 import '../../logic/id3.dart';

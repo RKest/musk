@@ -1,6 +1,5 @@
 import 'package:get_it/get_it.dart';
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:musk/logic/audio_player.dart';
 import '../../logic/id3.dart';
 import '../../logic/state.dart';
@@ -25,10 +24,6 @@ class _TrackListState extends State<TrackList>
   final isMakingPlaylistId = GetIt.I.get<IsMakingPlaylistIdentity>();
   final RepeatIconIdentity repeatIconIdentity = RepeatIconIdentity();
 
-  playTrack(Tag tag) {
-    myAudioPlayer.play(tag.mp3Path);
-  }
-
   trackOnTap(Tag tag) {
     if (isMakingPlaylistId.current) {
       if (newPlaylistId.current.mp3Paths.contains(tag.mp3Path)) {
@@ -50,7 +45,7 @@ class _TrackListState extends State<TrackList>
   void initState() {
     super.initState();
     getTags().listen(tracksId.initTracks);
-    currTrackId.stream$.listen(playTrack);
+    currTrackId.stream$.listen(myAudioPlayer.playFromTag);
     isMakingPlaylistId.stream$.listen(refreshTracks);
     newPlaylistId.stream$.listen(refreshTracks);
   }

@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
@@ -47,15 +46,12 @@ int? currentTrackIndex() {
 void playNextTrack(void _, {bool manualTrackSkip = false}) {
   final tracksId = GetIt.I.get<TracksIdentity>();
   final currentTrackId = GetIt.I.get<TagIdentity>();
-  final audioPlayer = GetIt.I.get<AudioPlayer>();
   final int? currTrackIndex = currentTrackIndex();
   if ((RepeatIconIdentity.currentRepeatValue != RepeatEnum.repeatOnce ||
           manualTrackSkip) &&
       currTrackIndex != null) {
     if (currTrackIndex == tracksId.current.length - 1) {
-      if (RepeatIconIdentity.currentRepeatValue == RepeatEnum.disabled) {
-        audioPlayer.release();
-      } else {
+      if (RepeatIconIdentity.currentRepeatValue != RepeatEnum.disabled) {
         currentTrackId.changeTrack(tracksId.current[0]);
       }
     } else {

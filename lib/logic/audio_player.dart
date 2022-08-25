@@ -1,10 +1,12 @@
 import 'dart:math';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
 import '../functions.dart';
+import 'id3.dart';
 import 'state.dart';
 
 class MyAudioPlayerState {
@@ -14,8 +16,10 @@ class MyAudioPlayerState {
   int currentProgress = 0;
 }
 
-class MyAudioPlayer {
+class MyAudioPlayer extends BaseAudioHandler {
   final AudioPlayer _audioPlayer = GetIt.I.get<AudioPlayer>();
+  final tracksId = GetIt.I.get<TracksIdentity>();
+  final currTagId = GetIt.I.get<TagIdentity>();
   final RepeatIconIdentity _repeatIconIdentity = RepeatIconIdentity();
 
   MyAudioPlayerState myState = MyAudioPlayerState();
@@ -31,34 +35,92 @@ class MyAudioPlayer {
   MyAudioPlayer() {
     _audioPlayer.onPlayerCompletion.listen(playNextTrack);
     _repeatIconIdentity.stream$.listen(setTrackLooping);
+
+    playbackState.add(
+      playbackState.value.copyWith(
+        systemActions: <MediaAction>{
+          MediaAction.seek,
+        },
+        controls: <MediaControl>[
+          MediaControl.skipToPrevious,
+          MediaControl.play,
+          MediaControl.skipToNext,
+        ],
+      ),
+    );
+  }
+
+  @override
+  Future<void> play() async {
+    _audioPlayer.resume();
+    playbackState.add(
+      playbackState.value.copyWith(
+        playing: true,
+        controls: <MediaControl>[
+          MediaControl.skipToPrevious,
+          MediaControl.pause,
+          MediaControl.skipToNext,
+        ],
+      ),
+    );
+    super.play();
+  }
+
+  @override
+  Future<void> pause() async {
+    _audioPlayer.pause();
+    playbackState.add(
+      playbackState.value.copyWith(
+        playing: false,
+        controls: <MediaControl>[
+          MediaControl.skipToPrevious,
+          MediaControl.play,
+          MediaControl.skipToNext,
+        ],
+      ),
+    );
+    super.pause();
+  }
+
+  @override
+  Future<void> skipToNext() {
+    playNextTrack(null);
+    _updateTrackNotif(currTagId.current);
+    return super.skipToNext();
+  }
+
+  @override
+  Future<void> skipToPrevious() {
+    if (myState.currentProgress > 5000) {
+      seekTo(0.0);
+    } else {
+      playPreviosTrack();
+      _updateTrackNotif(currTagId.current);
+    }
+    return super.skipToPrevious();
   }
 
   void playPause() {
     if (_currPlayerState == PlayerState.PLAYING) {
       pause();
     } else {
-      resume();
+      play();
     }
   }
 
-  void play(String path) {
-    if (path.isNotEmpty) {
-      _audioPlayer.play(path, isLocal: true, stayAwake: true);
+  void playFromTag(Tag tag) {
+    if (tag.mp3Path.isNotEmpty) {
+      _updateTrackNotif(tag);
+      _audioPlayer.play(tag.mp3Path, isLocal: true, stayAwake: true);
     }
-  }
-
-  void resume() {
-    _audioPlayer.resume();
-  }
-
-  void pause() {
-    _audioPlayer.pause();
   }
 
   void seekTo(double value) {
-    _audioPlayer.seek(
-        Duration(milliseconds: (value * myState.totalTrackDuration).toInt()));
-    resume();
+    final seekDuration =
+        Duration(milliseconds: (value * myState.totalTrackDuration).toInt());
+    _audioPlayer.seek(seekDuration);
+    seek(seekDuration);
+    play();
   }
 
   void setTotalTrackDuration() {
@@ -101,5 +163,27 @@ class MyAudioPlayer {
 
   void setDurationSliderVal(double value) {
     myState.durationSliderVal = value;
+  }
+
+  static Future<AudioHandler> initAudioService() async {
+    return AudioService.init(
+      builder: () => MyAudioPlayer(),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.example.musk.channel.audio',
+        androidNotificationChannelName: 'Musk',
+      ),
+    );
+  }
+
+  void _updateTrackNotif(Tag tag) {
+    final newMediaItem = MediaItem(
+      id: tag.mp3Path,
+      title: tag.title,
+      album: tag.album,
+      artist: tag.artist,
+    );
+    mediaItem.add(newMediaItem);
+    playbackState.add(playbackState.value.copyWith(playing: true));
+    play();
   }
 }
