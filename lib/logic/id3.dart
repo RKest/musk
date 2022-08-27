@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' show get, Response;
+import 'dart:convert' show utf8;
 
 class Tag {
   static const Map<String, String> _assocMap = {
@@ -92,7 +93,7 @@ class Tag {
   String mp3Path;
 
   Tag.fromBytes(Uint8List bytes, this.mp3Path) {
-    if (listEquals(bytes.sublist(0, 5), [73, 68, 51, 3, 0])) {
+    if (listEquals(bytes.sublist(0, 3), [73, 68, 51])) {
       final int tagSize = ID3.decodeTagSize(bytes.sublist(6, 10));
       // ignore: unused_local_variable
       // final int noTrailingBytes = ID3.numberOfTrailingBytes(bytes, tagSize);
@@ -254,6 +255,7 @@ class EncodedString {
   }
 
   static String decodeString(Uint8List bytes) {
+    //This should handle both ASCII as well as UTF-8, should, if not 0x03 means the string is utf8 encoded
     if (bytes[0] == 0x00) {
       return String.fromCharCodes(bytes.sublist(1));
     } else if (bytes[0] == 0x01) {
@@ -272,8 +274,10 @@ class EncodedString {
         throw "Wrongly encoded utf16 string";
       }
       return String.fromCharCodes(u16Bytes);
+    } else if (bytes[0] == 0x03) {
+      return utf8.decode(bytes.sublist(1));
     } else {
-      throw "First byte of a string wrongly encoded";
+      throw "First byte of a string wrongly encoded bytes are $bytes";
     }
   }
 }

@@ -33,7 +33,10 @@ class MyAudioPlayer extends BaseAudioHandler {
       _audioPlayer.onPlayerStateChanged;
 
   MyAudioPlayer() {
-    _audioPlayer.onPlayerCompletion.listen(playNextTrack);
+    _audioPlayer.onPlayerCompletion.listen((_) {
+      playNextTrack(null);
+      _updateTrackNotif(currTagId.current);
+    });
     _repeatIconIdentity.stream$.listen(setTrackLooping);
 
     playbackState.add(
