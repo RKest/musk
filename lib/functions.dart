@@ -21,6 +21,7 @@ void deleteAll() async {
 Stream<List<Tag>> getTags() async* {
   List<Tag> ret = [];
   var ents = await Utils.scanDir(await Utils.getFilePath);
+
   for (FileSystemEntity ent in ents) {
     final bool isFile = await FileSystemEntity.isFile(ent.path);
     if (isFile && ent.path.endsWith('.mp3')) {

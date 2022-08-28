@@ -82,10 +82,16 @@ class Tag {
   int _imageCutoffPoint = 0;
 
   Image get getImage {
-    if (picture != null && picture!.isNotEmpty) {
-      return Image.memory(picture!.sublist(_imageCutoffPoint));
-    } else {
-      return Image.asset("assets/def.png");
+    try {
+      if (picture != null && picture!.isNotEmpty) {
+        final image = Image.memory(picture!.sublist(_imageCutoffPoint));
+        return image;
+      } else {
+        final image = Image.asset("assets/def.png");
+        return image;
+      }
+    } catch (e) {
+      throw "Error getting image for $mp3Path - \n $e";
     }
   }
 
@@ -329,16 +335,18 @@ class ID3 {
       i += 1;
     }
     //Ignoring Picture Type
-    i += 1;
+    i += 2;
     if (textEncoding == 0) {
       while (bytes[i] != 0) {
         i += 1;
       }
+      i += 1;
     } else {
       while (bytes[i] != 0 || bytes[i + 1] != 0) {
         i += 2;
       }
+      i += 2;
     }
-    return i + 1;
+    return i;
   }
 }

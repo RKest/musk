@@ -1,4 +1,3 @@
-import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:get_it/get_it.dart';
@@ -110,7 +109,7 @@ class _MyAppState extends State<MyApp> {
           currentIndex: _currPageIndex,
           onTap: setIndex,
         ),
-        floatingActionButton: const FloatingActionButton(onPressed: deleteAll),
+        // floatingActionButton: const FloatingActionButton(onPressed: deleteAll),
       ),
     );
   }
